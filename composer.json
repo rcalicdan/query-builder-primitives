@@ -1,0 +1,31 @@
+{
+    "name": "rcalicdan/query-builder-primitives",
+    "description": "Immutable querybuilder building block for creating sql query builder libraries",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Rcalicdan\\QueryBuilderPrimitives\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Reymart A. Calicdan"
+        }
+    ],
+    "require": {
+        "php": "^8.2"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.0",
+        "pestphp/pest": "^3.0",
+        "mockery/mockery": "^1.0",
+        "phpstan/phpstan": "^2.0",
+        "phpstan/phpstan-strict-rules": "^2.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}
