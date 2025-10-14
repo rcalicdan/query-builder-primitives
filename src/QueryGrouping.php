@@ -1,8 +1,8 @@
 <?php
 
-namespace Rcalicdan\QueryBuilderPrimitives\Traits;
+namespace Rcalicdan\QueryBuilderPrimitives;
 
-trait QueryGroupingTrait
+trait QueryGrouping
 {
     /**
      * @var array<string> The GROUP BY clauses for the query.

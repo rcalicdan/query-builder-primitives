@@ -1,8 +1,8 @@
 <?php
 
-namespace Rcalicdan\QueryBuilderPrimitives\Traits;
+namespace Rcalicdan\QueryBuilderPrimitives;
 
-trait QueryConditionsTrait
+trait QueryConditions
 {
     /**
      * @var array<string> The WHERE conditions for the query.

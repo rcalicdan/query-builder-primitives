@@ -1,8 +1,8 @@
 <?php
 
-namespace Rcalicdan\QueryBuilderPrimitives\Traits;
+namespace Rcalicdan\QueryBuilderPrimitives;
 
-trait QueryAdvancedConditionsTrait
+trait QueryAdvancedConditions
 {
     /**
      * Add a custom condition group with specific logic.

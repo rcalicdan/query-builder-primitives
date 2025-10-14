@@ -2,7 +2,7 @@
 
 namespace Rcalicdan\QueryBuilderPrimitives\Traits;
 
-trait QueryBuilderCoreTrait
+trait QueryBuilderCore
 {
     /**
      * @var string The table name for the query.

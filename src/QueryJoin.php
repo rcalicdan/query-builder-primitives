@@ -1,8 +1,8 @@
 <?php
 
-namespace Rcalicdan\QueryBuilderPrimitives\Traits;
+namespace Rcalicdan\QueryBuilderPrimitives;
 
-trait QueryJoinTrait
+trait QueryJoin
 {
     /**
      * @var array<array{type: string, table: string, condition: string}> The join clauses for the query.

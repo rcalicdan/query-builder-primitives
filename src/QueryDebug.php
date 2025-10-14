@@ -1,8 +1,8 @@
 <?php
 
-namespace Rcalicdan\QueryBuilderPrimitives\Traits;
+namespace Rcalicdan\QueryBuilderPrimitives;
 
-trait QueryDebugTrait
+trait QueryDebug
 {
     /**
      * Get the built SQL query for debugging purposes.

@@ -1,8 +1,8 @@
 <?php
 
-namespace Rcalicdan\QueryBuilderPrimitives\Traits;
+namespace Rcalicdan\QueryBuilderPrimitives;
 
-trait SqlBuilderTrait
+trait SqlBuilder
 {
     /**
      * Build the SELECT SQL query string.
