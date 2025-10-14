@@ -8,6 +8,11 @@
             "Rcalicdan\\QueryBuilderPrimitives\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Test\\": "tests/"
+        }
+    },
     "authors": [
         {
             "name": "Reymart A. Calicdan"
