@@ -10,7 +10,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Test\\": "tests/"
+            "Tests\\": "tests/"
         }
     },
     "authors": [
@@ -32,5 +32,11 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true
         }
+    },
+     "scripts": {
+        "test": "./vendor/bin/pest",
+        "format": "./vendor/bin/pint",
+        "format-test": "./vendor/bin/pint --test",
+        "analyze": "./vendor/bin/phpstan analyse"
     }
 }

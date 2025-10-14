@@ -606,3 +606,489 @@ describe('Immutability', function () {
         expect($users->getBindings())->toBe(['active', 'user']);
     });
 });
+
+describe('Edge Cases', function () {
+    test('handles empty table name gracefully', function () {
+        $query = $this->builder->select('id');
+        
+        expect($query->toSql())->toBe('SELECT id FROM ');
+    });
+
+    test('handles very long column lists', function () {
+        $columns = array_map(fn($i) => "column{$i}", range(1, 50));
+        $query = $this->builder
+            ->table('users')
+            ->select($columns);
+        
+        expect($query->toSql())->toContain('column1');
+        expect($query->toSql())->toContain('column50');
+    });
+
+    test('handles special characters in values', function () {
+        $query = $this->builder
+            ->table('users')
+            ->where('name', "O'Brien")
+            ->where('description', 'Quote: "test"');
+        
+        expect($query->getBindings())->toBe(["O'Brien", 'Quote: "test"']);
+    });
+
+    test('handles null values in where clause', function () {
+        $query = $this->builder
+            ->table('users')
+            ->where('deleted_at', null);
+        
+        expect($query->getBindings())->toBe([null]);
+    });
+
+    test('handles boolean values', function () {
+        $query = $this->builder
+            ->table('users')
+            ->where('is_active', true)
+            ->where('is_deleted', false);
+        
+        expect($query->getBindings())->toBe([true, false]);
+    });
+
+    test('handles zero and empty string', function () {
+        $query = $this->builder
+            ->table('users')
+            ->where('count', 0)
+            ->where('name', '');
+        
+        expect($query->getBindings())->toBe([0, '']);
+    });
+});
+
+describe('Complex Nested Conditions', function () {
+    test('deeply nested where groups', function () {
+        $query = $this->builder
+            ->table('users')
+            ->where('status', 'active')
+            ->whereNested(function ($q) {
+                return $q
+                    ->where('role', 'admin')
+                    ->orWhereNested(function ($q2) {
+                        return $q2
+                            ->where('role', 'moderator')
+                            ->where('verified', true);
+                    });
+            });
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('status = ?');
+        expect($query->getBindings())->toHaveCount(4);
+    });
+
+    test('multiple nested groups with AND', function () {
+        $query = $this->builder
+            ->table('users')
+            ->whereNested(function ($q) {
+                return $q->where('age', '>', 18)->where('age', '<', 65);
+            })
+            ->whereNested(function ($q) {
+                return $q->where('country', 'US')->orWhere('country', 'CA');
+            });
+        
+        expect($query->getBindings())->toBe([18, 65, 'US', 'CA']);
+    });
+
+    test('combines whereIn with nested conditions', function () {
+        $query = $this->builder
+            ->table('users')
+            ->whereIn('status', ['active', 'pending'])
+            ->whereNested(function ($q) {
+                return $q->where('age', '>', 18)->orWhere('verified', true);
+            });
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('IN (?, ?)');
+        expect($query->getBindings())->toBe(['active', 'pending', 18, true]);
+    });
+});
+
+describe('Multiple Join Scenarios', function () {
+    test('joins with where conditions', function () {
+        $query = $this->builder
+            ->table('users')
+            ->join('profiles', 'users.id = profiles.user_id')
+            ->join('orders', 'users.id = orders.user_id')
+            ->where('users.status', 'active')
+            ->where('orders.total', '>', 100);
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('INNER JOIN profiles');
+        expect($sql)->toContain('INNER JOIN orders');
+        expect($sql)->toContain('WHERE');
+    });
+
+    test('mixed join types', function () {
+        $query = $this->builder
+            ->table('users')
+            ->leftJoin('profiles', 'users.id = profiles.user_id')
+            ->innerJoin('orders', 'users.id = orders.user_id')
+            ->rightJoin('payments', 'orders.id = payments.order_id');
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('LEFT JOIN');
+        expect($sql)->toContain('INNER JOIN');
+        expect($sql)->toContain('RIGHT JOIN');
+    });
+});
+
+describe('Subquery Edge Cases', function () {
+    test('nested whereExists', function () {
+        $query = $this->builder
+            ->table('users')
+            ->whereExists(function ($q) {
+                return $q
+                    ->table('orders')
+                    ->where('user_id', 'users.id')
+                    ->whereExists(function ($q2) {
+                        return $q2
+                            ->table('payments')
+                            ->where('order_id', 'orders.id');
+                    });
+            });
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('EXISTS');
+        expect(substr_count($sql, 'EXISTS'))->toBe(2);
+    });
+
+    test('multiple whereSub clauses', function () {
+        $query = $this->builder
+            ->table('users')
+            ->whereSub('order_count', '>', function ($q) {
+                return $q->table('orders')->select('COUNT(*)');
+            })
+            ->whereSub('total_spent', '>', function ($q) {
+                return $q->table('orders')->select('SUM(total)');
+            });
+        
+        $sql = $query->toSql();
+        expect(substr_count($sql, 'SELECT'))->toBeGreaterThan(1);
+    });
+});
+
+describe('Order and Grouping Edge Cases', function () {
+    test('multiple order by clauses', function () {
+        $query = $this->builder
+            ->table('users')
+            ->orderBy('status', 'DESC')
+            ->orderBy('name', 'ASC')
+            ->orderBy('created_at', 'DESC');
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('ORDER BY status DESC, name ASC, created_at DESC');
+    });
+
+    test('group by with having and order by', function () {
+        $query = $this->builder
+            ->table('orders')
+            ->select('user_id, COUNT(*) as total')
+            ->groupBy('user_id')
+            ->having('COUNT(*)', '>', 5)
+            ->orderBy('total', 'DESC');
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('GROUP BY');
+        expect($sql)->toContain('HAVING');
+        expect($sql)->toContain('ORDER BY');
+    });
+
+    test('multiple group by with multiple having', function () {
+        $query = $this->builder
+            ->table('orders')
+            ->groupBy(['user_id', 'status'])
+            ->having('COUNT(*)', '>', 5)
+            ->having('SUM(total)', '>', 1000);
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('GROUP BY user_id, status');
+        expect(substr_count($sql, 'HAVING'))->toBe(1);
+    });
+});
+
+describe('Pagination Edge Cases', function () {
+    test('paginate with large page numbers', function () {
+        $query = $this->builder
+            ->table('users')
+            ->paginate(100, 50);
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('LIMIT 50');
+        expect($sql)->toContain('OFFSET 4950');
+    });
+
+    test('paginate with zero per page throws or handles gracefully', function () {
+        $query = $this->builder
+            ->table('users')
+            ->paginate(1, 0);
+        
+        expect($query->toSql())->toContain('LIMIT 0');
+    });
+
+    test('limit without offset', function () {
+        $query = $this->builder
+            ->table('users')
+            ->limit(25);
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('LIMIT 25');
+        expect($sql)->not->toContain('OFFSET');
+    });
+});
+
+describe('Like Clause Variations', function () {
+    test('multiple like clauses', function () {
+        $query = $this->builder
+            ->table('users')
+            ->like('name', 'John')
+            ->like('email', 'gmail', 'after');
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('LIKE');
+        expect($query->getBindings())->toBe(['%John%', 'gmail%']);
+    });
+
+    test('like with empty string', function () {
+        $query = $this->builder
+            ->table('users')
+            ->like('name', '');
+        
+        expect($query->getBindings())->toBe(['%%']);
+    });
+});
+
+describe('WhereIn Edge Cases', function () {
+    test('whereIn with single value', function () {
+        $query = $this->builder
+            ->table('users')
+            ->whereIn('id', [1]);
+        
+        expect($query->toSql())->toBe('SELECT * FROM users WHERE id IN (?)');
+        expect($query->getBindings())->toBe([1]);
+    });
+
+    test('whereIn with large array', function () {
+        $values = range(1, 1000);
+        $query = $this->builder
+            ->table('users')
+            ->whereIn('id', $values);
+        
+        expect($query->getBindings())->toHaveCount(1000);
+        expect(substr_count($query->toSql(), '?'))->toBe(1000);
+    });
+
+    test('multiple whereIn clauses', function () {
+        $query = $this->builder
+            ->table('users')
+            ->whereIn('status', ['active', 'pending'])
+            ->whereIn('role', ['admin', 'moderator']);
+        
+        expect($query->getBindings())->toBe(['active', 'pending', 'admin', 'moderator']);
+    });
+
+    test('whereIn and whereNotIn together', function () {
+        $query = $this->builder
+            ->table('users')
+            ->whereIn('status', ['active', 'pending'])
+            ->whereNotIn('role', ['banned', 'suspended']);
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('IN (?, ?)');
+        expect($sql)->toContain('NOT IN (?, ?)');
+    });
+});
+
+describe('WhereBetween Edge Cases', function () {
+    test('whereBetween with same values', function () {
+        $query = $this->builder
+            ->table('users')
+            ->whereBetween('age', [18, 18]);
+        
+        expect($query->toSql())->toContain('BETWEEN ? AND ?');
+        expect($query->getBindings())->toBe([18, 18]);
+    });
+
+    test('whereBetween with dates', function () {
+        $query = $this->builder
+            ->table('orders')
+            ->whereBetween('created_at', ['2024-01-01', '2024-12-31']);
+        
+        expect($query->getBindings())->toBe(['2024-01-01', '2024-12-31']);
+    });
+
+    test('multiple whereBetween clauses', function () {
+        $query = $this->builder
+            ->table('products')
+            ->whereBetween('price', [10, 100])
+            ->whereBetween('stock', [1, 1000]);
+        
+        expect($query->getBindings())->toBe([10, 100, 1, 1000]);
+    });
+});
+
+describe('WhereNull Edge Cases', function () {
+    test('multiple whereNull clauses', function () {
+        $query = $this->builder
+            ->table('users')
+            ->whereNull('deleted_at')
+            ->whereNull('banned_at');
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('deleted_at IS NULL');
+        expect($sql)->toContain('banned_at IS NULL');
+    });
+
+    test('whereNull and whereNotNull together', function () {
+        $query = $this->builder
+            ->table('users')
+            ->whereNull('deleted_at')
+            ->whereNotNull('email_verified_at');
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('IS NULL');
+        expect($sql)->toContain('IS NOT NULL');
+    });
+});
+
+describe('Raw SQL Edge Cases', function () {
+    test('whereRaw with complex conditions', function () {
+        $query = $this->builder
+            ->table('users')
+            ->whereRaw('DATE(created_at) = CURDATE()')
+            ->whereRaw('YEAR(created_at) = ?', [2024]);
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('DATE(created_at) = CURDATE()');
+        expect($query->getBindings())->toBe([2024]);
+    });
+
+    test('mix whereRaw with regular where', function () {
+        $query = $this->builder
+            ->table('users')
+            ->where('status', 'active')
+            ->whereRaw('age > ?', [18])
+            ->where('verified', true);
+        
+        expect($query->getBindings())->toBe(['active', 18, true]);
+    });
+
+    test('orWhereRaw after where clauses', function () {
+        $query = $this->builder
+            ->table('users')
+            ->where('status', 'active')
+            ->orWhereRaw('role = ? AND verified = ?', ['admin', true]);
+        
+        $sql = $query->toSql();
+        expect($sql)->toContain('OR');
+        expect($query->getBindings())->toBe(['active', 'admin', true]);
+    });
+});
+
+describe('Select Variations', function () {
+    test('select with table prefix', function () {
+        $query = $this->builder
+            ->table('users')
+            ->select(['users.id', 'users.name', 'profiles.bio'])
+            ->join('profiles', 'users.id = profiles.user_id');
+        
+        expect($query->toSql())->toContain('users.id, users.name, profiles.bio');
+    });
+
+    test('select with aliases', function () {
+        $query = $this->builder
+            ->table('users')
+            ->select(['id', 'name as full_name', 'email as contact_email']);
+        
+        expect($query->toSql())->toContain('name as full_name');
+    });
+
+    test('select with functions', function () {
+        $query = $this->builder
+            ->table('orders')
+            ->select(['user_id', 'COUNT(*) as order_count', 'SUM(total) as total_amount']);
+        
+        expect($query->toSql())->toContain('COUNT(*)');
+        expect($query->toSql())->toContain('SUM(total)');
+    });
+
+    test('addSelect preserves existing selections', function () {
+        $query = $this->builder
+            ->table('users')
+            ->select(['id', 'name'])
+            ->addSelect('email')
+            ->addSelect(['phone', 'address']);
+        
+        expect($query->toSql())->toBe('SELECT id, name, email, phone, address FROM users');
+    });
+});
+
+describe('Immutability Advanced', function () {
+    test('cloning preserves all state', function () {
+        $query1 = $this->builder
+            ->table('users')
+            ->select('id, name')
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->limit(10);
+        
+        $query2 = $query1->where('age', '>', 18);
+        
+        expect($query1->getBindings())->toBe(['active']);
+        expect($query2->getBindings())->toBe(['active', 18]);
+        expect($query1->toSql())->not->toContain('age');
+        expect($query2->toSql())->toContain('age');
+    });
+
+    test('resetWhere creates new instance', function () {
+        $query1 = $this->builder
+            ->table('users')
+            ->where('status', 'active')
+            ->where('age', '>', 18);
+        
+        $query2 = $query1->resetWhere();
+        
+        expect($query1->getBindings())->toBe(['active', 18]);
+        expect($query2->getBindings())->toBe([]);
+        expect($query1)->not->toBe($query2);
+    });
+});
+
+describe('toRawSql Edge Cases', function () {
+    test('toRawSql with null values', function () {
+        $query = $this->builder
+            ->table('users')
+            ->where('deleted_at', null)
+            ->where('name', 'John');
+        
+        $rawSql = $query->toRawSql();
+        expect($rawSql)->toContain('NULL');
+        expect($rawSql)->toContain("'John'");
+    });
+
+    test('toRawSql with boolean values', function () {
+        $query = $this->builder
+            ->table('users')
+            ->where('is_active', true)
+            ->where('is_deleted', false);
+        
+        $rawSql = $query->toRawSql();
+        // Check that booleans are properly represented
+        expect($rawSql)->toContain('1'); // or 'true' depending on your implementation
+        expect($rawSql)->toContain('0'); // or 'false'
+    });
+
+    test('toRawSql with array values in whereIn', function () {
+        $query = $this->builder
+            ->table('users')
+            ->whereIn('id', [1, 2, 3, 4, 5]);
+        
+        $rawSql = $query->toRawSql();
+        expect($rawSql)->not->toContain('?');
+        expect($rawSql)->toContain('1');
+        expect($rawSql)->toContain('5');
+    });
+});
