@@ -1,11 +1,10 @@
-Of course. Here is the revised documentation with the "Testing" section and its examples removed.
+Of course. Here is the documentation presented in a standard format.
 
-## README.md
+***
 
-```markdown
 # Query Builder Primitives
 
-A collection of PHP traits for building immutable, fluent PDO query builders. This library provides low-level primitives without forcing any specific implementation.
+A collection of PHP traits for building immutable, fluent query builders. This library provides low-level primitives without forcing any specific implementation.
 
 ## Installation
 
@@ -21,7 +20,8 @@ This library provides **building blocks**, not a complete query builder. You com
 
 ### Dependency Map
 
-```QueryBuilderCore (foundation - required)
+```
+QueryBuilderCore (foundation - required)
   ↓
 SqlBuilder (depends on: properties from condition/join/grouping traits)
   ↓
@@ -37,7 +37,7 @@ QueryDebug (depends on: all traits)
 ### Trait Descriptions
 
 | Trait | Purpose | Dependencies |
-|-------|---------|--------------|
+| :--- | :--- | :--- |
 | `QueryBuilderCore` | Core properties and table/select methods | None (foundation) |
 | `SqlBuilder` | Builds SQL query strings | QueryBuilderCore + condition/join/grouping traits |
 | `QueryConditions` | Basic WHERE, HAVING, LIKE clauses | QueryBuilderCore |
@@ -66,7 +66,7 @@ class QueryBuilder
     use QueryBuilderCore;
     use SqlBuilder;
     use QueryConditions;
-
+    
     public function __construct(?string $table = null)
     {
         if ($table !== null) {
@@ -116,7 +116,7 @@ class FullQueryBuilder
     use QueryJoin;
     use QueryGrouping;
     use QueryDebug;
-
+    
     public function __construct(?string $table = null)
     {
         if ($table !== null) {
@@ -148,16 +148,17 @@ $qb->table('users')
 Foundation trait providing core functionality.
 
 **Properties:**
-- `$table` - Table name
-- `$select` - Select columns
-- `$bindings` - Parameter bindings array
+*   `$table` - Table name
+*   `$select` - Select columns
+*   `$bindings` - Parameter bindings array
 
 **Methods:**
 ```php
 table(string $table): static
 select(string|array $columns): static
 addSelect(string|array $columns): static
-selectDistinct(string|array $columns): static```
+selectDistinct(string|array $columns): static
+```
 
 **Example:**
 ```php
@@ -199,10 +200,10 @@ $qb->where('status', 'active')
 $qb->where('status', 'active');
 
 // WHERE IN
-$qb->whereIn('id',);
+$qb->whereIn('id', [1, 2, 3, 4, 5]);
 
 // WHERE BETWEEN
-$qb->whereBetween('age',);
+$qb->whereBetween('age', [18, 65]);
 
 // NULL checks
 $qb->whereNull('deleted_at')
@@ -302,8 +303,7 @@ JOIN operations.
 
 **Dependencies:** Requires `QueryBuilderCore`
 
-**Methods:**
-```php
+**Methods:**```php
 join(string $table, string $condition, string $type = 'INNER'): static
 leftJoin(string $table, string $condition): static
 rightJoin(string $table, string $condition): static
@@ -487,62 +487,62 @@ class ExecutableQueryBuilder extends FullQueryBuilder
     ) {
         parent::__construct($table);
     }
-
+    
     public function get(): array
     {
         $sql = $this->buildSelectQuery();
         $bindings = $this->getCompiledBindings();
-
+        
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($bindings);
-
+        
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
-
+    
     public function first(): ?array
     {
         $result = $this->limit(1)->get();
-        return $result ?? null;
+        return $result[0] ?? null;
     }
-
+    
     public function count(string $column = '*'): int
     {
         $sql = $this->buildCountQuery($column);
         $bindings = $this->getCompiledBindings();
-
+        
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($bindings);
-
+        
         return (int) $stmt->fetchColumn();
     }
-
+    
     public function insert(array $data): bool
     {
         $sql = $this->buildInsertQuery($data);
         $stmt = $this->pdo->prepare($sql);
-
+        
         return $stmt->execute(array_values($data));
     }
-
+    
     public function update(array $data): int
     {
         $sql = $this->buildUpdateQuery($data);
         $bindings = array_merge(array_values($data), $this->getCompiledBindings());
-
+        
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($bindings);
-
+        
         return $stmt->rowCount();
     }
-
+    
     public function delete(): int
     {
         $sql = $this->buildDeleteQuery();
         $bindings = $this->getCompiledBindings();
-
+        
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($bindings);
-
+        
         return $stmt->rowCount();
     }
 }
@@ -560,7 +560,9 @@ $users = $qb->table('users')
 
 ## Recommended Compositions
 
-### 1. Read-Only Query Builder```php
+### 1. Read-Only Query Builder
+
+```php
 class ReadOnlyQueryBuilder
 {
     use QueryBuilderCore;
@@ -569,9 +571,11 @@ class ReadOnlyQueryBuilder
     use QueryJoin;
     use QueryGrouping;
     use QueryDebug;
-}```
+}
+```
 
 ### 2. Simple Query Builder (No Advanced Features)
+
 ```php
 class SimpleQueryBuilder
 {
@@ -583,6 +587,7 @@ class SimpleQueryBuilder
 ```
 
 ### 3. Reporting Query Builder (Heavy on Joins/Grouping)
+
 ```php
 class ReportingQueryBuilder
 {
@@ -596,6 +601,7 @@ class ReportingQueryBuilder
 ```
 
 ### 4. Complex Query Builder (All Features)
+
 ```php
 class ComplexQueryBuilder
 {
@@ -667,8 +673,8 @@ $qb->table('orders')
 
 ## Requirements
 
-- PHP 8.1 or higher
-- PDO extension (for execution implementations)
+*   PHP 8.1 or higher
+*   PDO extension (for execution implementations)
 
 ## License
 
@@ -677,4 +683,3 @@ MIT
 ## Contributing
 
 This is a primitive library - keep it simple and focused on building blocks, not opinions.
-```
