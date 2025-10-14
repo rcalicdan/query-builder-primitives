@@ -26,4 +26,9 @@ class MockQueryBuilder
             $this->table = $table;
         }
     }
+
+    public static function table(string $table): self
+    {
+        return new self($table);
+    }
 }

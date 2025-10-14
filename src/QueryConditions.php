@@ -55,6 +55,11 @@ trait QueryConditions
     protected array $having = [];
 
     /**
+     * @var array<array{type: string, bindings: array<mixed>}> Track condition order
+     */
+    protected array $conditionOrder = [];
+
+    /**
      * Add a WHERE clause to the query.
      *
      * @param  string  $column  The column name.
@@ -77,6 +82,7 @@ trait QueryConditions
         $placeholder = $instance->getPlaceholder();
         $instance->where[] = "{$column} {$operator} {$placeholder}";
         $instance->bindings['where'][] = $value;
+        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => [$value]];
 
         return $instance;
     }
@@ -104,6 +110,7 @@ trait QueryConditions
         $placeholder = $instance->getPlaceholder();
         $instance->orWhere[] = "{$column} {$operator} {$placeholder}";
         $instance->bindings['orWhere'][] = $value;
+        $instance->conditionOrder[] = ['type' => 'or', 'bindings' => [$value]];
 
         return $instance;
     }
@@ -125,6 +132,7 @@ trait QueryConditions
         $placeholders = implode(', ', array_fill(0, count($values), $instance->getPlaceholder()));
         $instance->whereIn[] = "{$column} IN ({$placeholders})";
         $instance->bindings['whereIn'] = array_merge($instance->bindings['whereIn'], $values);
+        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => $values];
 
         return $instance;
     }
@@ -146,6 +154,7 @@ trait QueryConditions
         $placeholders = implode(', ', array_fill(0, count($values), $instance->getPlaceholder()));
         $instance->whereNotIn[] = "{$column} NOT IN ({$placeholders})";
         $instance->bindings['whereNotIn'] = array_merge($instance->bindings['whereNotIn'], $values);
+        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => $values];
 
         return $instance;
     }
@@ -171,6 +180,7 @@ trait QueryConditions
         $instance->whereBetween[] = "{$column} BETWEEN {$placeholder1} AND {$placeholder2}";
         $instance->bindings['whereBetween'][] = $values[0];
         $instance->bindings['whereBetween'][] = $values[1];
+        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => [$values[0], $values[1]]];
 
         return $instance;
     }
@@ -185,6 +195,7 @@ trait QueryConditions
     {
         $instance = clone $this;
         $instance->whereNull[] = "{$column} IS NULL";
+        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => []];
 
         return $instance;
     }
@@ -199,6 +210,7 @@ trait QueryConditions
     {
         $instance = clone $this;
         $instance->whereNotNull[] = "{$column} IS NOT NULL";
+        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => []];
 
         return $instance;
     }
@@ -225,6 +237,7 @@ trait QueryConditions
         };
 
         $instance->bindings['where'][] = $likeValue;
+        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => [$likeValue]];
 
         return $instance;
     }
@@ -287,9 +300,11 @@ trait QueryConditions
         if (strtoupper($operator) === 'OR') {
             $instance->orWhereRaw[] = $condition;
             $instance->bindings['orWhereRaw'] = array_merge($instance->bindings['orWhereRaw'], $bindings);
+            $instance->conditionOrder[] = ['type' => 'or', 'bindings' => $bindings];
         } else {
             $instance->whereRaw[] = $condition;
             $instance->bindings['whereRaw'] = array_merge($instance->bindings['whereRaw'], $bindings);
+            $instance->conditionOrder[] = ['type' => 'and', 'bindings' => $bindings];
         }
 
         return $instance;
@@ -324,6 +339,7 @@ trait QueryConditions
         $instance->whereNotNull = [];
         $instance->whereRaw = [];
         $instance->orWhereRaw = [];
+        $instance->conditionOrder = [];
         $instance->bindings['where'] = [];
         $instance->bindings['whereIn'] = [];
         $instance->bindings['whereNotIn'] = [];

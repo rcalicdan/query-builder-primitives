@@ -339,7 +339,7 @@ trait QueryDebug
         }
 
         if (is_bool($value)) {
-            return $value ? 'true' : 'false';
+            return $value ? '1' : '0';
         }
 
         if (is_string($value)) {

@@ -11,8 +11,8 @@ trait SqlBuilder
      */
     protected function buildSelectQuery(): string
     {
-        $sql = 'SELECT ' . implode(', ', $this->select);
-        $sql .= ' FROM ' . $this->table;
+        $sql = 'SELECT '.implode(', ', $this->select);
+        $sql .= ' FROM '.$this->table;
 
         foreach ($this->joins as $join) {
             if ($join['type'] === 'CROSS') {
@@ -24,25 +24,25 @@ trait SqlBuilder
 
         $whereSql = $this->buildWhereClause();
         if ($whereSql !== '') {
-            $sql .= ' WHERE ' . $whereSql;
+            $sql .= ' WHERE '.$whereSql;
         }
 
         if ($this->groupBy !== []) {
-            $sql .= ' GROUP BY ' . implode(', ', $this->groupBy);
+            $sql .= ' GROUP BY '.implode(', ', $this->groupBy);
         }
 
         if ($this->having !== []) {
-            $sql .= ' HAVING ' . implode(' AND ', $this->having);
+            $sql .= ' HAVING '.implode(' AND ', $this->having);
         }
 
         if ($this->orderBy !== []) {
-            $sql .= ' ORDER BY ' . implode(', ', $this->orderBy);
+            $sql .= ' ORDER BY '.implode(', ', $this->orderBy);
         }
 
         if ($this->limit !== null) {
-            $sql .= ' LIMIT ' . $this->limit;
+            $sql .= ' LIMIT '.$this->limit;
             if ($this->offset !== null) {
-                $sql .= ' OFFSET ' . $this->offset;
+                $sql .= ' OFFSET '.$this->offset;
             }
         }
 
@@ -57,7 +57,7 @@ trait SqlBuilder
      */
     protected function buildCountQuery(string $column = '*'): string
     {
-        $sql = "SELECT COUNT({$column}) FROM " . $this->table;
+        $sql = "SELECT COUNT({$column}) FROM ".$this->table;
 
         foreach ($this->joins as $join) {
             if ($join['type'] === 'CROSS') {
@@ -69,15 +69,15 @@ trait SqlBuilder
 
         $whereSql = $this->buildWhereClause();
         if ($whereSql !== '') {
-            $sql .= ' WHERE ' . $whereSql;
+            $sql .= ' WHERE '.$whereSql;
         }
 
         if ($this->groupBy !== []) {
-            $sql .= ' GROUP BY ' . implode(', ', $this->groupBy);
+            $sql .= ' GROUP BY '.implode(', ', $this->groupBy);
         }
 
         if ($this->having !== []) {
-            $sql .= ' HAVING ' . implode(' AND ', $this->having);
+            $sql .= ' HAVING '.implode(' AND ', $this->having);
         }
 
         return $sql;
@@ -113,7 +113,7 @@ trait SqlBuilder
         }
 
         $columns = implode(', ', array_keys($firstRow));
-        $placeholders = '(' . implode(', ', array_fill(0, count($firstRow), '?')) . ')';
+        $placeholders = '('.implode(', ', array_fill(0, count($firstRow), '?')).')';
         $allPlaceholders = implode(', ', array_fill(0, count($data), $placeholders));
 
         return "INSERT INTO {$this->table} ({$columns}) VALUES {$allPlaceholders}";
@@ -131,10 +131,10 @@ trait SqlBuilder
         foreach (array_keys($data) as $column) {
             $setClauses[] = "{$column} = ?";
         }
-        $sql = "UPDATE {$this->table} SET " . implode(', ', $setClauses);
+        $sql = "UPDATE {$this->table} SET ".implode(', ', $setClauses);
         $whereSql = $this->buildWhereClause();
         if ($whereSql !== '') {
-            $sql .= ' WHERE ' . $whereSql;
+            $sql .= ' WHERE '.$whereSql;
         }
 
         return $sql;
@@ -150,7 +150,7 @@ trait SqlBuilder
         $sql = "DELETE FROM {$this->table}";
         $whereSql = $this->buildWhereClause();
         if ($whereSql !== '') {
-            $sql .= ' WHERE ' . $whereSql;
+            $sql .= ' WHERE '.$whereSql;
         }
 
         return $sql;
@@ -191,13 +191,13 @@ trait SqlBuilder
             $this->whereRaw
         );
 
-        $filteredAnd = array_filter($andConditions, fn($condition) => trim($condition) !== '');
+        $filteredAnd = array_filter($andConditions, fn ($condition) => trim($condition) !== '');
         if ($filteredAnd !== []) {
             $parts[] = ['conditions' => $filteredAnd, 'operator' => 'AND', 'priority' => 1];
         }
 
         $orConditions = array_merge($this->orWhere, $this->orWhereRaw);
-        $filteredOr = array_filter($orConditions, fn($condition) => trim($condition) !== '');
+        $filteredOr = array_filter($orConditions, fn ($condition) => trim($condition) !== '');
         if ($filteredOr !== []) {
             $parts[] = ['conditions' => $filteredOr, 'operator' => 'OR', 'priority' => 2];
         }
@@ -214,14 +214,14 @@ trait SqlBuilder
      */
     protected function buildConditionGroup(array $conditions, string $operator): string
     {
-        $filteredConditions = array_filter($conditions, fn($condition) => trim($condition) !== '');
+        $filteredConditions = array_filter($conditions, fn ($condition) => trim($condition) !== '');
 
         if ($filteredConditions === []) {
             return '';
         }
 
         // Just join with the operator, no extra parentheses
-        return implode(' ' . strtoupper($operator) . ' ', $filteredConditions);
+        return implode(' '.strtoupper($operator).' ', $filteredConditions);
     }
 
     /**
@@ -236,7 +236,7 @@ trait SqlBuilder
             return '';
         }
 
-        usort($parts, fn($a, $b) => $a['priority'] <=> $b['priority']);
+        usort($parts, fn ($a, $b) => $a['priority'] <=> $b['priority']);
 
         $andParts = [];
         $orParts = [];
@@ -271,36 +271,26 @@ trait SqlBuilder
      */
     protected function combineAndOrParts(array $andParts, array $orParts): string
     {
-        // If we only have AND parts and no OR parts
         if ($orParts === []) {
             if ($andParts === []) {
                 return '';
             }
 
-            // Join all AND parts - no wrapping needed when there's no OR
             return implode(' AND ', $andParts);
         }
 
-        // If we have both AND and OR parts, we need proper grouping for precedence
         $finalParts = [];
 
         if ($andParts !== []) {
-            // When mixing AND with OR, we need to check if AND parts need grouping
-            // If we have a single AND part that's already wrapped (from whereNested), keep it
-            // Otherwise, if multiple conditions, wrap them
-
             $combinedAnd = implode(' AND ', $andParts);
 
-            // If there are multiple conditions in the AND part (contains ' AND '),
-            // or if we have multiple AND parts, wrap them
             if (count($andParts) > 1 || str_contains($combinedAnd, ' AND ')) {
-                $finalParts[] = '(' . $combinedAnd . ')';
+                $finalParts[] = '('.$combinedAnd.')';
             } else {
                 $finalParts[] = $combinedAnd;
             }
         }
 
-        // Add OR parts
         foreach ($orParts as $orPart) {
             $finalParts[] = $orPart;
         }

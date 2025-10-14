@@ -91,7 +91,6 @@ trait QueryBuilderCore
     {
         $instance = $this->select($columns);
 
-        // Add DISTINCT to the first column
         if ($instance->select !== [] && $instance->select[0] !== '*') {
             $instance->select[0] = 'DISTINCT '.$instance->select[0];
         } elseif ($instance->select[0] === '*') {
@@ -118,7 +117,15 @@ trait QueryBuilderCore
      */
     protected function getCompiledBindings(): array
     {
-        // This merge order MUST match the order in `collectAllConditionParts()`
+        if (! empty($this->conditionOrder)) {
+            $whereBindings = [];
+            foreach ($this->conditionOrder as $item) {
+                $whereBindings = array_merge($whereBindings, $item['bindings']);
+            }
+
+            return array_merge($whereBindings, $this->bindings['having']);
+        }
+
         $whereBindings = array_merge(
             $this->bindings['where'],
             $this->bindings['whereIn'],
