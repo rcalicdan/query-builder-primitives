@@ -1,6 +1,7 @@
 <?php
 namespace Rcalicdan\QueryBuilderPrimitives;
 
+/** @phpstan-consistent-constructor */
 class QueryBuilderBase
 {
     use QueryBuilderCore;

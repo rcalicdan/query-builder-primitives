@@ -60,7 +60,7 @@ trait QueryAdvancedConditions
         $subBuilder = new static;
         $subBuilder = $callback($subBuilder);
 
-        if (empty($subBuilder->table)) {
+        if ($subBuilder->table === null || $subBuilder->table === '') {
             throw new \InvalidArgumentException('Subquery must specify a table using table() method.');
         }
 
@@ -82,7 +82,7 @@ trait QueryAdvancedConditions
         $subBuilder = new static;
         $subBuilder = $callback($subBuilder);
 
-        if (empty($subBuilder->table)) {
+        if ($subBuilder->table === null || $subBuilder->table === '') {
             throw new \InvalidArgumentException('Subquery must specify a table using table() method');
         }
 
@@ -127,7 +127,7 @@ trait QueryAdvancedConditions
         $subBuilder = new static;
         $subBuilder = $callback($subBuilder);
 
-        if (empty($subBuilder->table)) {
+        if ($subBuilder->table === null || $subBuilder->table === '') {
             throw new \InvalidArgumentException('Subquery must specify a table using table() method');
         }
 
