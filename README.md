@@ -1,5 +1,3 @@
-Of course. Here is the documentation presented in a standard format.
-
 ***
 
 # Query Builder Primitives
