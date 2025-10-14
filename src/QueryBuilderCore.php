@@ -92,7 +92,7 @@ trait QueryBuilderCore
         $instance = $this->select($columns);
 
         if ($instance->select !== [] && $instance->select[0] !== '*') {
-            $instance->select[0] = 'DISTINCT '.$instance->select[0];
+            $instance->select[0] = 'DISTINCT ' . $instance->select[0];
         } elseif ($instance->select[0] === '*') {
             $instance->select[0] = 'DISTINCT *';
         }
@@ -117,7 +117,7 @@ trait QueryBuilderCore
      */
     protected function getCompiledBindings(): array
     {
-        if (! empty($this->conditionOrder)) {
+        if (count($this->conditionOrder) > 0) {
             $whereBindings = [];
             foreach ($this->conditionOrder as $item) {
                 $whereBindings = array_merge($whereBindings, $item['bindings']);
