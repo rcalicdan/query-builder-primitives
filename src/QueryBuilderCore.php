@@ -1,6 +1,6 @@
 <?php
 
-namespace Rcalicdan\QueryBuilderPrimitives\Traits;
+namespace Rcalicdan\QueryBuilderPrimitives;
 
 trait QueryBuilderCore
 {
