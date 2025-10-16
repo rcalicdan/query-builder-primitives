@@ -35,17 +35,85 @@ trait SqlBuilder
             $sql .= ' HAVING '.implode(' AND ', $this->having);
         }
 
+        // Apply ORDER BY before pagination for SQL Server compatibility
         if ($this->orderBy !== []) {
             $sql .= ' ORDER BY '.implode(', ', $this->orderBy);
         }
 
-        if ($this->limit !== null) {
-            $sql .= ' LIMIT '.$this->limit;
-            if ($this->offset !== null) {
-                $sql .= ' OFFSET '.$this->offset;
-            }
+        // Apply database-specific pagination
+        $sql = $this->applyPagination($sql);
+
+        return $sql;
+    }
+
+    /**
+     * Apply database-specific pagination syntax.
+     *
+     * @param  string  $sql  The SQL query string.
+     * @return string The SQL query with pagination applied.
+     */
+    protected function applyPagination(string $sql): string
+    {
+        $driver = $this->getDriver();
+        
+        // No pagination needed
+        if ($this->limit === null && $this->offset === null) {
+            return $sql;
         }
 
+        switch ($driver) {
+            case 'sqlsrv':
+            case 'mssql':
+                return $this->applySqlServerPagination($sql);
+                
+            case 'mysql':
+            case 'pgsql':
+            case 'sqlite':
+            default:
+                return $this->applyStandardPagination($sql);
+        }
+    }
+
+    /**
+     * Apply SQL Server pagination (OFFSET...FETCH).
+     *
+     * @param  string  $sql  The SQL query string.
+     * @return string The SQL query with SQL Server pagination.
+     */
+    protected function applySqlServerPagination(string $sql): string
+    {
+        // SQL Server requires ORDER BY for OFFSET/FETCH
+        if ($this->orderBy === [] && ($this->limit !== null || $this->offset !== null)) {
+            // Add a default ORDER BY if none exists
+            $sql .= ' ORDER BY (SELECT NULL)';
+        }
+        
+        $offset = $this->offset ?? 0;
+        $sql .= " OFFSET {$offset} ROWS";
+        
+        if ($this->limit !== null) {
+            $sql .= " FETCH NEXT {$this->limit} ROWS ONLY";
+        }
+        
+        return $sql;
+    }
+
+    /**
+     * Apply standard pagination (LIMIT...OFFSET).
+     *
+     * @param  string  $sql  The SQL query string.
+     * @return string The SQL query with standard pagination.
+     */
+    protected function applyStandardPagination(string $sql): string
+    {
+        if ($this->limit !== null) {
+            $sql .= ' LIMIT '.$this->limit;
+        }
+        
+        if ($this->offset !== null) {
+            $sql .= ' OFFSET '.$this->offset;
+        }
+        
         return $sql;
     }
 

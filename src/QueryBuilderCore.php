@@ -34,6 +34,11 @@ trait QueryBuilderCore
     protected int $bindingIndex = 0;
 
     /**
+     * @var string|null The database driver name (mysql, pgsql, sqlsrv, sqlite)
+     */
+    protected ?string $driver = null;
+
+    /**
      * Set the table for the query.
      *
      * @param  string  $table  The table name.
@@ -98,6 +103,30 @@ trait QueryBuilderCore
         }
 
         return $instance;
+    }
+
+    /**
+     * Set the database driver.
+     *
+     * @param  string  $driver  The driver name (mysql, pgsql, sqlsrv, mssql, sqlite)
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function setDriver(string $driver): static
+    {
+        $instance = clone $this;
+        $instance->driver = strtolower($driver);
+
+        return $instance;
+    }
+
+    /**
+     * Get the database driver.
+     *
+     * @return string The database driver name.
+     */
+    protected function getDriver(): string
+    {
+        return $this->driver ?? 'mysql'; // Default to MySQL
     }
 
     /**

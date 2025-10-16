@@ -194,6 +194,10 @@ trait QueryDebug
             'HAVING',
             'LIMIT',
             'OFFSET',
+            'FETCH',
+            'NEXT',
+            'ROWS',
+            'ONLY',
             'AND',
             'OR',
             'IN',
@@ -248,6 +252,10 @@ trait QueryDebug
             'HAVING',
             'LIMIT',
             'OFFSET',
+            'FETCH',
+            'NEXT',
+            'ROWS',
+            'ONLY',
             'AND',
             'OR',
             'IN',
@@ -294,6 +302,7 @@ trait QueryDebug
 
         echo "\033[1;37mStats:\033[0m\n";
         echo "  Table: \033[0;36m{$this->table}\033[0m\n";
+        echo "  Driver: \033[0;36m{$this->getDriver()}\033[0m\n";
         echo "  Bindings: \033[0;33m$bindingCount\033[0m\n";
         echo "  Joins: \033[0;33m$joinCount\033[0m\n";
         echo "  Conditions: \033[0;33m$conditionCount\033[0m\n";
@@ -321,6 +330,7 @@ trait QueryDebug
         echo '<div>';
         echo "<strong style='color: #f8f8f2;'>Stats:</strong><br>";
         echo "<span style='color: #6272a4;'>Table:</span> <span style='color: #8be9fd;'>{$this->table}</span> | ";
+        echo "<span style='color: #6272a4;'>Driver:</span> <span style='color: #8be9fd;'>{$this->getDriver()}</span> | ";
         echo "<span style='color: #6272a4;'>Bindings:</span> <span style='color: #f1fa8c;'>$bindingCount</span> | ";
         echo "<span style='color: #6272a4;'>Joins:</span> <span style='color: #f1fa8c;'>$joinCount</span> | ";
         echo "<span style='color: #6272a4;'>Conditions:</span> <span style='color: #f1fa8c;'>$conditionCount</span>";
