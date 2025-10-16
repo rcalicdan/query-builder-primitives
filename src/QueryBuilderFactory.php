@@ -15,6 +15,7 @@ class QueryBuilderFactory
      */
     public static function create(PDO $pdo, ?string $table = null): QueryBuilderBase
     {
+        /** @var string $driver */
         $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
         
         $builder = new QueryBuilderBase();
