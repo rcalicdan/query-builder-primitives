@@ -189,8 +189,9 @@ trait SqlBuilder
 
     /**
      * Build the UPSERT SQL query string (INSERT with conflict resolution).
+     * Now supports both single and batch upserts.
      *
-     * @param  array<string, mixed>  $data  The data to insert/update.
+     * @param  array<string, mixed>|array<array<string, mixed>>  $data  The data to insert/update.
      * @param  string|array<string>  $uniqueColumns  Column(s) that determine uniqueness.
      * @param  array<string>|null  $updateColumns  Columns to update on conflict (null = all except unique).
      * @return string The complete UPSERT SQL query.
@@ -203,6 +204,13 @@ trait SqlBuilder
             throw new \InvalidArgumentException('Data cannot be empty for upsert');
         }
 
+        $isBatch = is_array(reset($data)) && is_array(reset($data));
+
+        if (!$isBatch) {
+            $data = [$data];
+        }
+
+        /** @var array<array<string, mixed>> $data */
         $uniqueColumns = is_string($uniqueColumns) ? [$uniqueColumns] : $uniqueColumns;
 
         if ($uniqueColumns === []) {
@@ -222,23 +230,27 @@ trait SqlBuilder
 
     /**
      * Build MySQL upsert query using ON DUPLICATE KEY UPDATE.
-     * Note: MySQL doesn't allow specifying which columns trigger the conflict.
-     * It uses any UNIQUE index or PRIMARY KEY automatically.
-     * Requires MySQL 8.0.19+ for row alias syntax.
+     * Now supports batch inserts.
      *
-     * @param  array<string, mixed>  $data  The data to insert/update.
-     * @param  array<string>  $uniqueColumns  Column(s) that determine uniqueness (for reference only).
+     * @param  array<array<string, mixed>>  $data  The data to insert/update (array of records).
+     * @param  array<string>  $uniqueColumns  Column(s) that determine uniqueness.
      * @param  array<string>|null  $updateColumns  Columns to update on conflict.
      * @return string The MySQL upsert query.
      */
     protected function buildMySqlUpsert(array $data, array $uniqueColumns, ?array $updateColumns): string
     {
-        $columns = implode(', ', array_keys($data));
-        $placeholders = implode(', ', array_fill(0, count($data), '?'));
+        $firstRow = $data[0];
+        $columns = implode(', ', array_keys($firstRow));
 
-        $sql = "INSERT INTO {$this->table} ({$columns}) VALUES ({$placeholders})";
+        $rowPlaceholders = [];
+        foreach ($data as $row) {
+            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, count($row), '?')) . ')';
+        }
+        $allPlaceholders = implode(', ', $rowPlaceholders);
 
-        $columnsToUpdate = $updateColumns ?? array_diff(array_keys($data), $uniqueColumns);
+        $sql = "INSERT INTO {$this->table} ({$columns}) VALUES {$allPlaceholders}";
+
+        $columnsToUpdate = $updateColumns ?? array_diff(array_keys($firstRow), $uniqueColumns);
 
         if ($columnsToUpdate !== []) {
             $sql .= ' AS new';
@@ -255,23 +267,30 @@ trait SqlBuilder
 
     /**
      * Build PostgreSQL upsert query using ON CONFLICT DO UPDATE.
+     * Now supports batch inserts.
      *
-     * @param  array<string, mixed>  $data  The data to insert/update.
+     * @param  array<array<string, mixed>>  $data  The data to insert/update (array of records).
      * @param  array<string>  $uniqueColumns  Column(s) that determine uniqueness.
      * @param  array<string>|null  $updateColumns  Columns to update on conflict.
      * @return string The PostgreSQL upsert query.
      */
     protected function buildPostgreSqlUpsert(array $data, array $uniqueColumns, ?array $updateColumns): string
     {
-        $columns = implode(', ', array_keys($data));
-        $placeholders = implode(', ', array_fill(0, count($data), '?'));
+        $firstRow = $data[0];
+        $columns = implode(', ', array_keys($firstRow));
 
-        $sql = "INSERT INTO {$this->table} ({$columns}) VALUES ({$placeholders})";
+        $rowPlaceholders = [];
+        foreach ($data as $row) {
+            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, count($row), '?')) . ')';
+        }
+        $allPlaceholders = implode(', ', $rowPlaceholders);
+
+        $sql = "INSERT INTO {$this->table} ({$columns}) VALUES {$allPlaceholders}";
 
         $conflictColumns = implode(', ', $uniqueColumns);
         $sql .= " ON CONFLICT ({$conflictColumns})";
 
-        $columnsToUpdate = $updateColumns ?? array_diff(array_keys($data), $uniqueColumns);
+        $columnsToUpdate = $updateColumns ?? array_diff(array_keys($firstRow), $uniqueColumns);
 
         if ($columnsToUpdate !== []) {
             $updateParts = [];
@@ -288,23 +307,30 @@ trait SqlBuilder
 
     /**
      * Build SQLite upsert query using ON CONFLICT DO UPDATE.
+     * Now supports batch inserts.
      *
-     * @param  array<string, mixed>  $data  The data to insert/update.
+     * @param  array<array<string, mixed>>  $data  The data to insert/update (array of records).
      * @param  array<string>  $uniqueColumns  Column(s) that determine uniqueness.
      * @param  array<string>|null  $updateColumns  Columns to update on conflict.
      * @return string The SQLite upsert query.
      */
     protected function buildSqliteUpsert(array $data, array $uniqueColumns, ?array $updateColumns): string
     {
-        $columns = implode(', ', array_keys($data));
-        $placeholders = implode(', ', array_fill(0, count($data), '?'));
+        $firstRow = $data[0];
+        $columns = implode(', ', array_keys($firstRow));
 
-        $sql = "INSERT INTO {$this->table} ({$columns}) VALUES ({$placeholders})";
+        $rowPlaceholders = [];
+        foreach ($data as $row) {
+            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, count($row), '?')) . ')';
+        }
+        $allPlaceholders = implode(', ', $rowPlaceholders);
+
+        $sql = "INSERT INTO {$this->table} ({$columns}) VALUES {$allPlaceholders}";
 
         $conflictColumns = implode(', ', $uniqueColumns);
         $sql .= " ON CONFLICT ({$conflictColumns})";
 
-        $columnsToUpdate = $updateColumns ?? array_diff(array_keys($data), $uniqueColumns);
+        $columnsToUpdate = $updateColumns ?? array_diff(array_keys($firstRow), $uniqueColumns);
 
         if ($columnsToUpdate !== []) {
             $updateParts = [];
@@ -321,18 +347,24 @@ trait SqlBuilder
 
     /**
      * Build SQL Server upsert query using MERGE statement.
+     * Now supports batch inserts.
      *
-     * @param  array<string, mixed>  $data  The data to insert/update.
+     * @param  array<array<string, mixed>>  $data  The data to insert/update (array of records).
      * @param  array<string>  $uniqueColumns  Column(s) that determine uniqueness.
      * @param  array<string>|null  $updateColumns  Columns to update on conflict.
      * @return string The SQL Server upsert query.
      */
     protected function buildSqlServerUpsert(array $data, array $uniqueColumns, ?array $updateColumns): string
     {
-        $columns = array_keys($data);
+        $firstRow = $data[0];
+        $columns = array_keys($firstRow);
         $columnsStr = implode(', ', $columns);
 
-        $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+        $rowPlaceholders = [];
+        foreach ($data as $row) {
+            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, count($row), '?')) . ')';
+        }
+        $allPlaceholders = implode(', ', $rowPlaceholders);
 
         $matchConditions = [];
         foreach ($uniqueColumns as $column) {
@@ -343,7 +375,7 @@ trait SqlBuilder
         $columnsToUpdate = $updateColumns ?? array_diff($columns, $uniqueColumns);
 
         $sql = "MERGE INTO {$this->table} AS target ";
-        $sql .= "USING (SELECT {$placeholders}) AS source ({$columnsStr}) ";
+        $sql .= "USING (VALUES {$allPlaceholders}) AS source ({$columnsStr}) ";
         $sql .= "ON {$matchCondition} ";
 
         if ($columnsToUpdate !== []) {
