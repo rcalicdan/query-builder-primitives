@@ -7,8 +7,9 @@ describe('Order and Grouping Edge Cases', function () {
         $query = MockQueryBuilder::table('users')
             ->orderBy('status', 'DESC')
             ->orderBy('name', 'ASC')
-            ->orderBy('created_at', 'DESC');
-        
+            ->orderBy('created_at', 'DESC')
+        ;
+
         $sql = $query->toSql();
         expect($sql)->toContain('ORDER BY status DESC, name ASC, created_at DESC');
     });
@@ -18,8 +19,9 @@ describe('Order and Grouping Edge Cases', function () {
             ->select('user_id, COUNT(*) as total')
             ->groupBy('user_id')
             ->having('COUNT(*)', '>', 5)
-            ->orderBy('total', 'DESC');
-        
+            ->orderBy('total', 'DESC')
+        ;
+
         $sql = $query->toSql();
         expect($sql)->toContain('GROUP BY');
         expect($sql)->toContain('HAVING');
@@ -30,8 +32,9 @@ describe('Order and Grouping Edge Cases', function () {
         $query = MockQueryBuilder::table('orders')
             ->groupBy(['user_id', 'status'])
             ->having('COUNT(*)', '>', 5)
-            ->having('SUM(total)', '>', 1000);
-        
+            ->having('SUM(total)', '>', 1000)
+        ;
+
         $sql = $query->toSql();
         expect($sql)->toContain('GROUP BY user_id, status');
         expect(substr_count($sql, 'HAVING'))->toBe(1);

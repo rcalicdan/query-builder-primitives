@@ -12,10 +12,13 @@ describe('Complex Nested Conditions', function () {
                     ->orWhereNested(function ($q2) {
                         return $q2
                             ->where('role', 'moderator')
-                            ->where('verified', true);
-                    });
-            });
-        
+                            ->where('verified', true)
+                        ;
+                    })
+                ;
+            })
+        ;
+
         $sql = $query->toSql();
         expect($sql)->toContain('status = ?');
         expect($query->getBindings())->toHaveCount(4);
@@ -28,8 +31,9 @@ describe('Complex Nested Conditions', function () {
             })
             ->whereNested(function ($q) {
                 return $q->where('country', 'US')->orWhere('country', 'CA');
-            });
-        
+            })
+        ;
+
         expect($query->getBindings())->toBe([18, 65, 'US', 'CA']);
     });
 
@@ -38,8 +42,9 @@ describe('Complex Nested Conditions', function () {
             ->whereIn('status', ['active', 'pending'])
             ->whereNested(function ($q) {
                 return $q->where('age', '>', 18)->orWhere('verified', true);
-            });
-        
+            })
+        ;
+
         $sql = $query->toSql();
         expect($sql)->toContain('IN (?, ?)');
         expect($query->getBindings())->toBe(['active', 'pending', 18, true]);

@@ -97,7 +97,7 @@ trait QueryBuilderCore
         $instance = $this->select($columns);
 
         if ($instance->select !== [] && $instance->select[0] !== '*') {
-            $instance->select[0] = 'DISTINCT ' . $instance->select[0];
+            $instance->select[0] = 'DISTINCT '.$instance->select[0];
         } elseif ($instance->select[0] === '*') {
             $instance->select[0] = 'DISTINCT *';
         }

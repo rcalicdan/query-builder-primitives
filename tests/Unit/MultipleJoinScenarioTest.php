@@ -8,8 +8,9 @@ describe('Multiple Join Scenarios', function () {
             ->join('profiles', 'users.id = profiles.user_id')
             ->join('orders', 'users.id = orders.user_id')
             ->where('users.status', 'active')
-            ->where('orders.total', '>', 100);
-        
+            ->where('orders.total', '>', 100)
+        ;
+
         $sql = $query->toSql();
         expect($sql)->toContain('INNER JOIN profiles');
         expect($sql)->toContain('INNER JOIN orders');
@@ -20,8 +21,9 @@ describe('Multiple Join Scenarios', function () {
         $query = MockQueryBuilder::table('users')
             ->leftJoin('profiles', 'users.id = profiles.user_id')
             ->innerJoin('orders', 'users.id = orders.user_id')
-            ->rightJoin('payments', 'orders.id = payments.order_id');
-        
+            ->rightJoin('payments', 'orders.id = payments.order_id')
+        ;
+
         $sql = $query->toSql();
         expect($sql)->toContain('LEFT JOIN');
         expect($sql)->toContain('INNER JOIN');

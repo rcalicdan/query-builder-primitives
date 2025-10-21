@@ -8,8 +8,9 @@ describe('SqlBuilder', function () {
             ->select('id, name')
             ->where('status', 'active')
             ->orderBy('name')
-            ->limit(10);
-        
+            ->limit(10)
+        ;
+
         expect($query->toSql())->toBe('SELECT id, name FROM users WHERE status = ? ORDER BY name ASC LIMIT 10');
     });
 
@@ -20,8 +21,9 @@ describe('SqlBuilder', function () {
             ->where('orders.status', 'completed')
             ->groupBy('user_id')
             ->having('COUNT(*)', '>', 5)
-            ->orderBy('order_count', 'DESC');
-        
+            ->orderBy('order_count', 'DESC')
+        ;
+
         $sql = $query->toSql();
         expect($sql)->toContain('SELECT user_id, COUNT(*) as order_count');
         expect($sql)->toContain('LEFT JOIN users');
@@ -34,8 +36,9 @@ describe('SqlBuilder', function () {
         $query = MockQueryBuilder::table('users')
             ->where('status', 'active')
             ->where('verified', true)
-            ->orWhere('role', 'admin');
-        
+            ->orWhere('role', 'admin')
+        ;
+
         expect($query->toSql())->toContain('WHERE (status = ? AND verified = ?) OR role = ?');
     });
 });

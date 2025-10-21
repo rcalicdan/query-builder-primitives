@@ -9,9 +9,11 @@ describe('QueryAdvancedConditions', function () {
             ->whereGroup(function ($query) {
                 return $query
                     ->where('age', '>', 18)
-                    ->where('country', 'US');
-            });
-        
+                    ->where('country', 'US')
+                ;
+            })
+        ;
+
         expect($query->toSql())->toContain('WHERE status = ? AND (age > ? AND country = ?)');
         expect($query->getBindings())->toBe(['active', 18, 'US']);
     });
@@ -21,9 +23,11 @@ describe('QueryAdvancedConditions', function () {
             ->whereNested(function ($query) {
                 return $query
                     ->where('name', 'John')
-                    ->orWhere('name', 'Jane');
-            });
-        
+                    ->orWhere('name', 'Jane')
+                ;
+            })
+        ;
+
         expect($query->toSql())->toContain('WHERE (name = ? OR name = ?)');
         expect($query->getBindings())->toBe(['John', 'Jane']);
     });
@@ -34,9 +38,11 @@ describe('QueryAdvancedConditions', function () {
             ->orWhereNested(function ($query) {
                 return $query
                     ->where('role', 'admin')
-                    ->where('verified', true);
-            });
-        
+                    ->where('verified', true)
+                ;
+            })
+        ;
+
         expect($query->toSql())->toContain('WHERE status = ? OR (role = ? AND verified = ?)');
         expect($query->getBindings())->toBe(['active', 'admin', true]);
     });
@@ -46,18 +52,21 @@ describe('QueryAdvancedConditions', function () {
             ->whereExists(function ($query) {
                 return $query
                     ->table('orders')
-                    ->where('user_id', 'users.id');
-            });
-        
+                    ->where('user_id', 'users.id')
+                ;
+            })
+        ;
+
         expect($query->toSql())->toContain('WHERE EXISTS (SELECT * FROM orders');
     });
 
     test('throws exception for where exists without table', function () {
-        expect(fn() => MockQueryBuilder::table('users')
-            ->whereExists(function ($query) {
-                return $query->where('id', 1);
-            })
-        )->toThrow(\InvalidArgumentException::class, 'Subquery must specify a table');
+        expect(
+            fn () => MockQueryBuilder::table('users')
+                ->whereExists(function ($query) {
+                    return $query->where('id', 1);
+                })
+        )->toThrow(InvalidArgumentException::class, 'Subquery must specify a table');
     });
 
     test('adds where not exists', function () {
@@ -65,9 +74,11 @@ describe('QueryAdvancedConditions', function () {
             ->whereNotExists(function ($query) {
                 return $query
                     ->table('bans')
-                    ->where('user_id', 'users.id');
-            });
-        
+                    ->where('user_id', 'users.id')
+                ;
+            })
+        ;
+
         expect($query->toSql())->toContain('WHERE NOT EXISTS (SELECT * FROM bans');
     });
 
@@ -77,9 +88,11 @@ describe('QueryAdvancedConditions', function () {
             ->orWhereExists(function ($query) {
                 return $query
                     ->table('premium_memberships')
-                    ->where('user_id', 'users.id');
-            });
-        
+                    ->where('user_id', 'users.id')
+                ;
+            })
+        ;
+
         expect($query->toSql())->toContain('WHERE status = ? OR EXISTS');
     });
 
@@ -89,9 +102,11 @@ describe('QueryAdvancedConditions', function () {
             ->orWhereNotExists(function ($query) {
                 return $query
                     ->table('suspensions')
-                    ->where('user_id', 'users.id');
-            });
-        
+                    ->where('user_id', 'users.id')
+                ;
+            })
+        ;
+
         expect($query->toSql())->toContain('WHERE status = ? OR NOT EXISTS');
     });
 
@@ -100,9 +115,11 @@ describe('QueryAdvancedConditions', function () {
             ->whereSub('user_count', '>', function ($query) {
                 return $query
                     ->table('orders')
-                    ->select('COUNT(*)');
-            });
-        
+                    ->select('COUNT(*)')
+                ;
+            })
+        ;
+
         expect($query->toSql())->toContain('WHERE user_count > (SELECT COUNT(*) FROM orders)');
     });
 });

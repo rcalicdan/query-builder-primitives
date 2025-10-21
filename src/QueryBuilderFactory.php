@@ -11,20 +11,19 @@ class QueryBuilderFactory
      *
      * @param  PDO  $pdo  The PDO instance.
      * @param  string|null  $table  Optional table name.
-     * @return QueryBuilderBase
      */
     public static function create(PDO $pdo, ?string $table = null): QueryBuilderBase
     {
         /** @var string $driver */
         $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-        
+
         $builder = new QueryBuilderBase();
         $builder = $builder->setDriver($driver);
-        
+
         if ($table !== null) {
             $builder = $builder->table($table);
         }
-        
+
         return $builder;
     }
 
@@ -33,17 +32,16 @@ class QueryBuilderFactory
      *
      * @param  string  $driver  The database driver name (mysql, pgsql, sqlsrv, mssql, sqlite).
      * @param  string|null  $table  Optional table name.
-     * @return QueryBuilderBase
      */
     public static function createWithDriver(string $driver, ?string $table = null): QueryBuilderBase
     {
         $builder = new QueryBuilderBase();
         $builder = $builder->setDriver($driver);
-        
+
         if ($table !== null) {
             $builder = $builder->table($table);
         }
-        
+
         return $builder;
     }
 }

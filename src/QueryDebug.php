@@ -99,12 +99,12 @@ trait QueryDebug
      */
     protected function displayCliFormat(string $sql, array $bindings, string $rawSql, bool $die): void
     {
-        echo "\n" . str_repeat('=', 80) . "\n";
+        echo "\n".str_repeat('=', 80)."\n";
         echo $die ? "Query Builder DD (Execution Stopped)\n" : "Query Builder Dump\n";
-        echo str_repeat('=', 80) . "\n\n";
+        echo str_repeat('=', 80)."\n\n";
 
         echo "\033[1;36mSQL:\033[0m\n";
-        echo $this->highlightSqlCli($sql) . "\n\n";
+        echo $this->highlightSqlCli($sql)."\n\n";
 
         echo "\033[1;33mBindings:\033[0m\n";
         if (count($bindings) === 0) {
@@ -119,12 +119,12 @@ trait QueryDebug
         }
 
         echo "\033[1;32mRaw SQL:\033[0m\n";
-        echo $this->highlightSqlCli($rawSql) . "\n\n";
+        echo $this->highlightSqlCli($rawSql)."\n\n";
 
         // Show basic stats
         $this->displayBasicStats();
 
-        echo str_repeat('=', 80) . "\n\n";
+        echo str_repeat('=', 80)."\n\n";
     }
 
     /**
@@ -221,7 +221,7 @@ trait QueryDebug
         $highlighted = $sql;
         foreach ($keywords as $keyword) {
             $result = preg_replace(
-                '/\b' . preg_quote($keyword, '/') . '\b/i',
+                '/\b'.preg_quote($keyword, '/').'\b/i',
                 "\033[1;94m$keyword\033[0m",
                 $highlighted
             );
@@ -279,8 +279,8 @@ trait QueryDebug
         $highlighted = htmlspecialchars($sql);
         foreach ($keywords as $keyword) {
             $result = preg_replace(
-                '/\b' . preg_quote($keyword, '/') . '\b/i',
-                '<span style="color: #ff79c6; font-weight: bold;">' . $keyword . '</span>',
+                '/\b'.preg_quote($keyword, '/').'\b/i',
+                '<span style="color: #ff79c6; font-weight: bold;">'.$keyword.'</span>',
                 $highlighted
             );
             if ($result !== null) {
@@ -364,10 +364,10 @@ trait QueryDebug
         if (is_string($value)) {
             $length = strlen($value);
             if ($length > 100) {
-                return "'" . substr($value, 0, 97) . "...'";
+                return "'".substr($value, 0, 97)."...'";
             }
 
-            return "'" . $value . "'";
+            return "'".$value."'";
         }
 
         if (is_array($value) || is_object($value)) {
@@ -376,7 +376,7 @@ trait QueryDebug
                 return '(encoding error)';
             }
             if (strlen($json) > 100) {
-                return substr($json, 0, 97) . '...';
+                return substr($json, 0, 97).'...';
             }
 
             return $json;
@@ -390,7 +390,7 @@ trait QueryDebug
             return '(resource)';
         }
 
-        return '(unknown type: ' . gettype($value) . ')';
+        return '(unknown type: '.gettype($value).')';
     }
 
     /**

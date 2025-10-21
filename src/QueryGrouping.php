@@ -117,7 +117,7 @@ trait QueryGrouping
      * @param  int  $perPage  The number of records per page.
      * @return static Returns a new query builder instance for method chaining.
      */
-    public function paginate(int $page, int $perPage = 15): static
+    public function forPage(int $page, int $perPage = 15): static
     {
         $offset = ($page - 1) * $perPage;
 

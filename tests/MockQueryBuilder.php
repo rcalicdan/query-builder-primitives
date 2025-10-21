@@ -12,12 +12,12 @@ use Rcalicdan\QueryBuilderPrimitives\SqlBuilder;
 
 class MockQueryBuilder
 {
+    use QueryAdvancedConditions;
     use QueryBuilderCore;
     use QueryConditions;
-    use QueryAdvancedConditions;
-    use QueryJoin;
-    use QueryGrouping;
     use QueryDebug;
+    use QueryGrouping;
+    use QueryJoin;
     use SqlBuilder;
 
     public function __construct(?string $table = null)

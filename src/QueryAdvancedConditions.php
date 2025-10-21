@@ -57,7 +57,7 @@ trait QueryAdvancedConditions
      */
     public function whereExists(callable $callback, string $operator = 'AND'): static
     {
-        $subBuilder = new static;
+        $subBuilder = new static();
         $subBuilder = $callback($subBuilder);
 
         if ($subBuilder->table === null || $subBuilder->table === '') {
@@ -79,7 +79,7 @@ trait QueryAdvancedConditions
      */
     public function whereNotExists(callable $callback, string $operator = 'AND'): static
     {
-        $subBuilder = new static;
+        $subBuilder = new static();
         $subBuilder = $callback($subBuilder);
 
         if ($subBuilder->table === null || $subBuilder->table === '') {
@@ -124,7 +124,7 @@ trait QueryAdvancedConditions
      */
     public function whereSub(string $column, string $operator, callable $callback): static
     {
-        $subBuilder = new static;
+        $subBuilder = new static();
         $subBuilder = $callback($subBuilder);
 
         if ($subBuilder->table === null || $subBuilder->table === '') {

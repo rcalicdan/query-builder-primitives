@@ -11,8 +11,8 @@ trait SqlBuilder
      */
     protected function buildSelectQuery(): string
     {
-        $sql = 'SELECT ' . implode(', ', $this->select);
-        $sql .= ' FROM ' . $this->table;
+        $sql = 'SELECT '.implode(', ', $this->select);
+        $sql .= ' FROM '.$this->table;
 
         foreach ($this->joins as $join) {
             if ($join['type'] === 'CROSS') {
@@ -24,20 +24,20 @@ trait SqlBuilder
 
         $whereSql = $this->buildWhereClause();
         if ($whereSql !== '') {
-            $sql .= ' WHERE ' . $whereSql;
+            $sql .= ' WHERE '.$whereSql;
         }
 
         if ($this->groupBy !== []) {
-            $sql .= ' GROUP BY ' . implode(', ', $this->groupBy);
+            $sql .= ' GROUP BY '.implode(', ', $this->groupBy);
         }
 
         if ($this->having !== []) {
-            $sql .= ' HAVING ' . implode(' AND ', $this->having);
+            $sql .= ' HAVING '.implode(' AND ', $this->having);
         }
 
         // Apply ORDER BY before pagination for SQL Server compatibility
         if ($this->orderBy !== []) {
-            $sql .= ' ORDER BY ' . implode(', ', $this->orderBy);
+            $sql .= ' ORDER BY '.implode(', ', $this->orderBy);
         }
 
         // Apply database-specific pagination
@@ -107,11 +107,11 @@ trait SqlBuilder
     protected function applyStandardPagination(string $sql): string
     {
         if ($this->limit !== null) {
-            $sql .= ' LIMIT ' . $this->limit;
+            $sql .= ' LIMIT '.$this->limit;
         }
 
         if ($this->offset !== null) {
-            $sql .= ' OFFSET ' . $this->offset;
+            $sql .= ' OFFSET '.$this->offset;
         }
 
         return $sql;
@@ -125,7 +125,7 @@ trait SqlBuilder
      */
     protected function buildCountQuery(string $column = '*'): string
     {
-        $sql = "SELECT COUNT({$column}) FROM " . $this->table;
+        $sql = "SELECT COUNT({$column}) FROM ".$this->table;
 
         foreach ($this->joins as $join) {
             if ($join['type'] === 'CROSS') {
@@ -137,15 +137,15 @@ trait SqlBuilder
 
         $whereSql = $this->buildWhereClause();
         if ($whereSql !== '') {
-            $sql .= ' WHERE ' . $whereSql;
+            $sql .= ' WHERE '.$whereSql;
         }
 
         if ($this->groupBy !== []) {
-            $sql .= ' GROUP BY ' . implode(', ', $this->groupBy);
+            $sql .= ' GROUP BY '.implode(', ', $this->groupBy);
         }
 
         if ($this->having !== []) {
-            $sql .= ' HAVING ' . implode(' AND ', $this->having);
+            $sql .= ' HAVING '.implode(' AND ', $this->having);
         }
 
         return $sql;
@@ -181,7 +181,7 @@ trait SqlBuilder
         }
 
         $columns = implode(', ', array_keys($firstRow));
-        $placeholders = '(' . implode(', ', array_fill(0, count($firstRow), '?')) . ')';
+        $placeholders = '('.implode(', ', array_fill(0, count($firstRow), '?')).')';
         $allPlaceholders = implode(', ', array_fill(0, count($data), $placeholders));
 
         return "INSERT INTO {$this->table} ({$columns}) VALUES {$allPlaceholders}";
@@ -195,7 +195,7 @@ trait SqlBuilder
      * @param  string|array<string>  $uniqueColumns  Column(s) that determine uniqueness.
      * @param  array<string>|null  $updateColumns  Columns to update on conflict (null = all except unique).
      * @return string The complete UPSERT SQL query.
-     * 
+     *
      * @throws \InvalidArgumentException When parameters are invalid.
      */
     protected function buildUpsertQuery(array $data, string|array $uniqueColumns, ?array $updateColumns = null): string
@@ -206,7 +206,7 @@ trait SqlBuilder
 
         $isBatch = is_array(reset($data)) && is_array(reset($data));
 
-        if (!$isBatch) {
+        if (! $isBatch) {
             $data = [$data];
         }
 
@@ -244,7 +244,7 @@ trait SqlBuilder
 
         $rowPlaceholders = [];
         foreach ($data as $row) {
-            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, count($row), '?')) . ')';
+            $rowPlaceholders[] = '('.implode(', ', array_fill(0, count($row), '?')).')';
         }
         $allPlaceholders = implode(', ', $rowPlaceholders);
 
@@ -259,7 +259,7 @@ trait SqlBuilder
             foreach ($columnsToUpdate as $column) {
                 $updateParts[] = "{$column} = new.{$column}";
             }
-            $sql .= ' ON DUPLICATE KEY UPDATE ' . implode(', ', $updateParts);
+            $sql .= ' ON DUPLICATE KEY UPDATE '.implode(', ', $updateParts);
         }
 
         return $sql;
@@ -281,7 +281,7 @@ trait SqlBuilder
 
         $rowPlaceholders = [];
         foreach ($data as $row) {
-            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, count($row), '?')) . ')';
+            $rowPlaceholders[] = '('.implode(', ', array_fill(0, count($row), '?')).')';
         }
         $allPlaceholders = implode(', ', $rowPlaceholders);
 
@@ -297,7 +297,7 @@ trait SqlBuilder
             foreach ($columnsToUpdate as $column) {
                 $updateParts[] = "{$column} = EXCLUDED.{$column}";
             }
-            $sql .= ' DO UPDATE SET ' . implode(', ', $updateParts);
+            $sql .= ' DO UPDATE SET '.implode(', ', $updateParts);
         } else {
             $sql .= ' DO NOTHING';
         }
@@ -321,7 +321,7 @@ trait SqlBuilder
 
         $rowPlaceholders = [];
         foreach ($data as $row) {
-            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, count($row), '?')) . ')';
+            $rowPlaceholders[] = '('.implode(', ', array_fill(0, count($row), '?')).')';
         }
         $allPlaceholders = implode(', ', $rowPlaceholders);
 
@@ -337,7 +337,7 @@ trait SqlBuilder
             foreach ($columnsToUpdate as $column) {
                 $updateParts[] = "{$column} = excluded.{$column}";
             }
-            $sql .= ' DO UPDATE SET ' . implode(', ', $updateParts);
+            $sql .= ' DO UPDATE SET '.implode(', ', $updateParts);
         } else {
             $sql .= ' DO NOTHING';
         }
@@ -362,7 +362,7 @@ trait SqlBuilder
 
         $rowPlaceholders = [];
         foreach ($data as $row) {
-            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, count($row), '?')) . ')';
+            $rowPlaceholders[] = '('.implode(', ', array_fill(0, count($row), '?')).')';
         }
         $allPlaceholders = implode(', ', $rowPlaceholders);
 
@@ -383,11 +383,11 @@ trait SqlBuilder
             foreach ($columnsToUpdate as $column) {
                 $updateParts[] = "target.{$column} = source.{$column}";
             }
-            $sql .= "WHEN MATCHED THEN UPDATE SET " . implode(', ', $updateParts) . " ";
+            $sql .= 'WHEN MATCHED THEN UPDATE SET '.implode(', ', $updateParts).' ';
         }
 
-        $sql .= "WHEN NOT MATCHED THEN INSERT ({$columnsStr}) VALUES (" .
-            implode(', ', array_map(fn($col) => "source.{$col}", $columns)) . ");";
+        $sql .= "WHEN NOT MATCHED THEN INSERT ({$columnsStr}) VALUES (".
+            implode(', ', array_map(fn ($col) => "source.{$col}", $columns)).');';
 
         return $sql;
     }
@@ -404,10 +404,10 @@ trait SqlBuilder
         foreach (array_keys($data) as $column) {
             $setClauses[] = "{$column} = ?";
         }
-        $sql = "UPDATE {$this->table} SET " . implode(', ', $setClauses);
+        $sql = "UPDATE {$this->table} SET ".implode(', ', $setClauses);
         $whereSql = $this->buildWhereClause();
         if ($whereSql !== '') {
-            $sql .= ' WHERE ' . $whereSql;
+            $sql .= ' WHERE '.$whereSql;
         }
 
         return $sql;
@@ -423,7 +423,7 @@ trait SqlBuilder
         $sql = "DELETE FROM {$this->table}";
         $whereSql = $this->buildWhereClause();
         if ($whereSql !== '') {
-            $sql .= ' WHERE ' . $whereSql;
+            $sql .= ' WHERE '.$whereSql;
         }
 
         return $sql;
@@ -464,13 +464,13 @@ trait SqlBuilder
             $this->whereRaw
         );
 
-        $filteredAnd = array_filter($andConditions, fn($condition) => trim($condition) !== '');
+        $filteredAnd = array_filter($andConditions, fn ($condition) => trim($condition) !== '');
         if ($filteredAnd !== []) {
             $parts[] = ['conditions' => $filteredAnd, 'operator' => 'AND', 'priority' => 1];
         }
 
         $orConditions = array_merge($this->orWhere, $this->orWhereRaw);
-        $filteredOr = array_filter($orConditions, fn($condition) => trim($condition) !== '');
+        $filteredOr = array_filter($orConditions, fn ($condition) => trim($condition) !== '');
         if ($filteredOr !== []) {
             $parts[] = ['conditions' => $filteredOr, 'operator' => 'OR', 'priority' => 2];
         }
@@ -487,14 +487,14 @@ trait SqlBuilder
      */
     protected function buildConditionGroup(array $conditions, string $operator): string
     {
-        $filteredConditions = array_filter($conditions, fn($condition) => trim($condition) !== '');
+        $filteredConditions = array_filter($conditions, fn ($condition) => trim($condition) !== '');
 
         if ($filteredConditions === []) {
             return '';
         }
 
         // Just join with the operator, no extra parentheses
-        return implode(' ' . strtoupper($operator) . ' ', $filteredConditions);
+        return implode(' '.strtoupper($operator).' ', $filteredConditions);
     }
 
     /**
@@ -509,7 +509,7 @@ trait SqlBuilder
             return '';
         }
 
-        usort($parts, fn($a, $b) => $a['priority'] <=> $b['priority']);
+        usort($parts, fn ($a, $b) => $a['priority'] <=> $b['priority']);
 
         $andParts = [];
         $orParts = [];
@@ -558,7 +558,7 @@ trait SqlBuilder
             $combinedAnd = implode(' AND ', $andParts);
 
             if (count($andParts) > 1 || str_contains($combinedAnd, ' AND ')) {
-                $finalParts[] = '(' . $combinedAnd . ')';
+                $finalParts[] = '('.$combinedAnd.')';
             } else {
                 $finalParts[] = $combinedAnd;
             }
