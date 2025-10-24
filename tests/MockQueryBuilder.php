@@ -18,7 +18,11 @@ class MockQueryBuilder
     use QueryDebug;
     use QueryGrouping;
     use QueryJoin;
-    use SqlBuilder;
+    use SqlBuilder {
+        buildAggregateQuery as protected traitBuildAggregateQuery;
+        buildCountQuery as protected traitBuildCountQuery;
+        buildSelectQuery as protected traitBuildSelectQuery;
+    }
 
     public function __construct(?string $table = null)
     {
@@ -30,5 +34,20 @@ class MockQueryBuilder
     public static function table(string $table): self
     {
         return new self($table);
+    }
+
+    public function buildAggregateQuery(string $function, string $column): string
+    {
+        return $this->traitBuildAggregateQuery($function, $column);
+    }
+
+    public function buildCountQuery(string $column = '*'): string
+    {
+        return $this->traitBuildCountQuery($column);
+    }
+
+    public function buildSelectQuery(): string
+    {
+        return $this->traitBuildSelectQuery();
     }
 }
