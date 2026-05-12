@@ -624,7 +624,7 @@ $qb->table('users')
         return $q->where('status', 'active')
                  ->where('role', 'admin');
     })
-    ->orWhereGroup(function($q) {
+    ->whereGroup(function($q) {
         return $q->where('status', 'pending')
                  ->where('invited', true);
     });
