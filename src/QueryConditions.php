@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Rcalicdan\QueryBuilderPrimitives;
 
 trait QueryConditions
@@ -62,9 +64,10 @@ trait QueryConditions
     /**
      * Add a WHERE clause to the query.
      *
-     * @param  string  $column  The column name.
-     * @param  mixed  $operator  The comparison operator or value if only 2 arguments.
-     * @param  mixed  $value  The value to compare against.
+     * @param string $column The column name.
+     * @param mixed $operator The comparison operator or value if only 2 arguments.
+     * @param mixed $value The value to compare against.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function where(string $column, mixed $operator = null, mixed $value = null): static
@@ -90,9 +93,10 @@ trait QueryConditions
     /**
      * Add an OR WHERE clause to the query.
      *
-     * @param  string  $column  The column name.
-     * @param  mixed  $operator  The comparison operator or value if only 2 arguments.
-     * @param  mixed  $value  The value to compare against.
+     * @param string $column The column name.
+     * @param mixed $operator The comparison operator or value if only 2 arguments.
+     * @param mixed $value The value to compare against.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function orWhere(string $column, mixed $operator = null, mixed $value = null): static
@@ -118,8 +122,9 @@ trait QueryConditions
     /**
      * Add a WHERE IN clause to the query.
      *
-     * @param  string  $column  The column name.
-     * @param  array<mixed>  $values  The values to check against.
+     * @param string $column The column name.
+     * @param array<mixed> $values The values to check against.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function whereIn(string $column, array $values): static
@@ -129,7 +134,7 @@ trait QueryConditions
         }
 
         $instance = clone $this;
-        $placeholders = implode(', ', array_fill(0, count($values), $instance->getPlaceholder()));
+        $placeholders = implode(', ', array_fill(0, \count($values), $instance->getPlaceholder()));
         $instance->whereIn[] = "{$column} IN ({$placeholders})";
         $instance->bindings['whereIn'] = array_merge($instance->bindings['whereIn'], $values);
         $instance->conditionOrder[] = ['type' => 'and', 'bindings' => $values];
@@ -140,8 +145,9 @@ trait QueryConditions
     /**
      * Add a WHERE NOT IN clause to the query.
      *
-     * @param  string  $column  The column name.
-     * @param  array<mixed>  $values  The values to check against.
+     * @param string $column The column name.
+     * @param array<mixed> $values The values to check against.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function whereNotIn(string $column, array $values): static
@@ -162,8 +168,9 @@ trait QueryConditions
     /**
      * Add a WHERE BETWEEN clause to the query.
      *
-     * @param  array<mixed>  $values  An array with exactly 2 values for the range.
-     * @param  string  $column  The column name.
+     * @param array<mixed> $values An array with exactly 2 values for the range.
+     * @param string $column The column name.
+     *
      * @return static Returns a new query builder instance for method chaining.
      *
      * @throws \InvalidArgumentException When values array doesn't contain exactly 2 elements.
@@ -188,7 +195,8 @@ trait QueryConditions
     /**
      * Add a WHERE NULL clause to the query.
      *
-     * @param  string  $column  The column name.
+     * @param string $column The column name.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function whereNull(string $column): static
@@ -203,7 +211,8 @@ trait QueryConditions
     /**
      * Add a WHERE NOT NULL clause to the query.
      *
-     * @param  string  $column  The column name.
+     * @param string $column The column name.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function whereNotNull(string $column): static
@@ -218,9 +227,10 @@ trait QueryConditions
     /**
      * Add a LIKE clause to the query.
      *
-     * @param  string  $column  The column name.
-     * @param  string  $value  The value to search for.
-     * @param  string  $side  The side to add wildcards ('before', 'after', 'both').
+     * @param string $column The column name.
+     * @param string $value The value to search for.
+     * @param string $side The side to add wildcards ('before', 'after', 'both').
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function like(string $column, string $value, string $side = 'both'): static
@@ -245,19 +255,20 @@ trait QueryConditions
     /**
      * Add a HAVING clause to the query.
      *
-     * @param  string  $column  The column name.
-     * @param  mixed  $operator  The comparison operator or value if only 2 arguments.
-     * @param  mixed  $value  The value to compare against.
+     * @param string $column The column name.
+     * @param mixed $operator The comparison operator or value if only 2 arguments.
+     * @param mixed $value The value to compare against.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function having(string $column, mixed $operator = null, mixed $value = null): static
     {
-        if (func_num_args() === 2) {
+        if (\func_num_args() === 2) {
             $value = $operator;
             $operator = '=';
         }
 
-        if (! is_string($operator)) {
+        if (! \is_string($operator)) {
             $operator = '=';
         }
 
@@ -272,8 +283,9 @@ trait QueryConditions
     /**
      * Add a raw HAVING condition.
      *
-     * @param  string  $condition  The raw SQL condition.
-     * @param  array<mixed>  $bindings  Parameter bindings for the condition.
+     * @param string $condition The raw SQL condition.
+     * @param array<mixed> $bindings Parameter bindings for the condition.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function havingRaw(string $condition, array $bindings = []): static
@@ -288,9 +300,10 @@ trait QueryConditions
     /**
      * Add a raw WHERE condition.
      *
-     * @param  string  $condition  The raw SQL condition.
-     * @param  array<mixed>  $bindings  Parameter bindings for the condition.
-     * @param  string  $operator  Logical operator ('AND' or 'OR').
+     * @param string $condition The raw SQL condition.
+     * @param array<mixed> $bindings Parameter bindings for the condition.
+     * @param string $operator Logical operator ('AND' or 'OR').
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function whereRaw(string $condition, array $bindings = [], string $operator = 'AND'): static
@@ -313,8 +326,9 @@ trait QueryConditions
     /**
      * Add a raw OR WHERE condition.
      *
-     * @param  string  $condition  The raw SQL condition.
-     * @param  array<mixed>  $bindings  Parameter bindings for the condition.
+     * @param string $condition The raw SQL condition.
+     * @param array<mixed> $bindings Parameter bindings for the condition.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function orWhereRaw(string $condition, array $bindings = []): static

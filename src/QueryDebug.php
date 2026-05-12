@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Rcalicdan\QueryBuilderPrimitives;
 
 trait QueryDebug
@@ -35,7 +37,7 @@ trait QueryDebug
         $sql = $this->toSql();
         $bindings = $this->getBindings();
 
-        if (count($bindings) === 0) {
+        if (\count($bindings) === 0) {
             return $sql;
         }
 
@@ -74,7 +76,7 @@ trait QueryDebug
     /**
      * Display query information in a clean, Laravel-like format.
      *
-     * @param  bool  $die  Whether to stop execution after displaying.
+     * @param bool $die Whether to stop execution after displaying.
      */
     protected function displayQuery(bool $die): void
     {
@@ -95,16 +97,16 @@ trait QueryDebug
     /**
      * Display query in CLI format.
      *
-     * @param  array<mixed>  $bindings
+     * @param array<mixed> $bindings
      */
     protected function displayCliFormat(string $sql, array $bindings, string $rawSql, bool $die): void
     {
-        echo "\n".str_repeat('=', 80)."\n";
+        echo "\n" . str_repeat('=', 80) . "\n";
         echo $die ? "Query Builder DD (Execution Stopped)\n" : "Query Builder Dump\n";
-        echo str_repeat('=', 80)."\n\n";
+        echo str_repeat('=', 80) . "\n\n";
 
         echo "\033[1;36mSQL:\033[0m\n";
-        echo $this->highlightSqlCli($sql)."\n\n";
+        echo $this->highlightSqlCli($sql) . "\n\n";
 
         echo "\033[1;33mBindings:\033[0m\n";
         if (count($bindings) === 0) {
@@ -119,18 +121,18 @@ trait QueryDebug
         }
 
         echo "\033[1;32mRaw SQL:\033[0m\n";
-        echo $this->highlightSqlCli($rawSql)."\n\n";
+        echo $this->highlightSqlCli($rawSql) . "\n\n";
 
         // Show basic stats
         $this->displayBasicStats();
 
-        echo str_repeat('=', 80)."\n\n";
+        echo str_repeat('=', 80) . "\n\n";
     }
 
     /**
      * Display query in web format.
      *
-     * @param  array<mixed>  $bindings
+     * @param array<mixed> $bindings
      */
     protected function displayWebFormat(string $sql, array $bindings, string $rawSql, bool $die): void
     {
@@ -148,7 +150,7 @@ trait QueryDebug
 
         echo "<div style='margin-bottom: 15px;'>";
         echo "<strong style='color: #f1fa8c;'>Bindings:</strong><br>";
-        if (count($bindings) === 0) {
+        if (\count($bindings) === 0) {
             echo "<span style='color: #6272a4; font-style: italic;'>(no bindings)</span>";
         } else {
             echo "<ul style='margin: 5px 0; padding-left: 20px;'>";
@@ -221,7 +223,7 @@ trait QueryDebug
         $highlighted = $sql;
         foreach ($keywords as $keyword) {
             $result = preg_replace(
-                '/\b'.preg_quote($keyword, '/').'\b/i',
+                '/\b' . preg_quote($keyword, '/') . '\b/i',
                 "\033[1;94m$keyword\033[0m",
                 $highlighted
             );
@@ -279,8 +281,8 @@ trait QueryDebug
         $highlighted = htmlspecialchars($sql);
         foreach ($keywords as $keyword) {
             $result = preg_replace(
-                '/\b'.preg_quote($keyword, '/').'\b/i',
-                '<span style="color: #ff79c6; font-weight: bold;">'.$keyword.'</span>',
+                '/\b' . preg_quote($keyword, '/') . '\b/i',
+                '<span style="color: #ff79c6; font-weight: bold;">' . $keyword . '</span>',
                 $highlighted
             );
             if ($result !== null) {
@@ -297,7 +299,7 @@ trait QueryDebug
     protected function displayBasicStats(): void
     {
         $bindingCount = count($this->getBindings());
-        $joinCount = count($this->joins ?? []);
+        $joinCount = count($this->joins);
         $conditionCount = $this->countConditions();
 
         echo "\033[1;37mStats:\033[0m\n";
@@ -323,8 +325,8 @@ trait QueryDebug
      */
     protected function displayBasicStatsWeb(): void
     {
-        $bindingCount = count($this->getBindings());
-        $joinCount = count($this->joins ?? []);
+        $bindingCount = \count($this->getBindings());
+        $joinCount = \count($this->joins);
         $conditionCount = $this->countConditions();
 
         echo '<div>';
@@ -353,44 +355,44 @@ trait QueryDebug
      */
     protected function formatValueForDisplay(mixed $value): string
     {
-        if (is_null($value)) {
+        if (\is_null($value)) {
             return 'NULL';
         }
 
-        if (is_bool($value)) {
+        if (\is_bool($value)) {
             return $value ? '1' : '0';
         }
 
-        if (is_string($value)) {
-            $length = strlen($value);
+        if (\is_string($value)) {
+            $length = \strlen($value);
             if ($length > 100) {
-                return "'".substr($value, 0, 97)."...'";
+                return "'" . substr($value, 0, 97) . "...'";
             }
 
-            return "'".$value."'";
+            return "'" . $value . "'";
         }
 
-        if (is_array($value) || is_object($value)) {
+        if (\is_array($value) || \is_object($value)) {
             $json = json_encode($value);
             if ($json === false) {
                 return '(encoding error)';
             }
-            if (strlen($json) > 100) {
-                return substr($json, 0, 97).'...';
+            if (\strlen($json) > 100) {
+                return substr($json, 0, 97) . '...';
             }
 
             return $json;
         }
 
-        if (is_scalar($value)) {
+        if (\is_scalar($value)) {
             return (string) $value;
         }
 
-        if (is_resource($value)) {
+        if (\is_resource($value)) {
             return '(resource)';
         }
 
-        return '(unknown type: '.gettype($value).')';
+        return '(unknown type: ' . gettype($value) . ')';
     }
 
     /**
@@ -398,14 +400,14 @@ trait QueryDebug
      */
     protected function countConditions(): int
     {
-        return count($this->where ?? []) +
-            count($this->orWhere ?? []) +
-            count($this->whereIn ?? []) +
-            count($this->whereNotIn ?? []) +
-            count($this->whereBetween ?? []) +
-            count($this->whereNull ?? []) +
-            count($this->whereNotNull ?? []) +
-            count($this->whereRaw ?? []) +
-            count($this->orWhereRaw ?? []);
+        return \count($this->where) +
+            \count($this->orWhere) +
+            \count($this->whereIn) +
+            \count($this->whereNotIn) +
+            \count($this->whereBetween) +
+            \count($this->whereNull) +
+            \count($this->whereNotNull) +
+            \count($this->whereRaw) +
+            \count($this->orWhereRaw);
     }
 }

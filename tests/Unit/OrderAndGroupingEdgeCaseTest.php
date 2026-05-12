@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Tests\MockQueryBuilder;
 
 describe('Order and Grouping Edge Cases', function () {

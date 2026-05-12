@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Rcalicdan\QueryBuilderPrimitives;
 
 trait SqlBuilder
@@ -49,7 +51,8 @@ trait SqlBuilder
     /**
      * Apply database-specific pagination syntax.
      *
-     * @param  string  $sql  The SQL query string.
+     * @param string $sql The SQL query string.
+     *
      * @return string The SQL query with pagination applied.
      */
     protected function applyPagination(string $sql): string
@@ -77,7 +80,8 @@ trait SqlBuilder
     /**
      * Apply SQL Server pagination (OFFSET...FETCH).
      *
-     * @param  string  $sql  The SQL query string.
+     * @param string $sql The SQL query string.
+     *
      * @return string The SQL query with SQL Server pagination.
      */
     protected function applySqlServerPagination(string $sql): string
@@ -101,7 +105,8 @@ trait SqlBuilder
     /**
      * Apply standard pagination (LIMIT...OFFSET).
      *
-     * @param  string  $sql  The SQL query string.
+     * @param string $sql The SQL query string.
+     *
      * @return string The SQL query with standard pagination.
      */
     protected function applyStandardPagination(string $sql): string
@@ -120,7 +125,8 @@ trait SqlBuilder
     /**
      * Build the COUNT SQL query string.
      *
-     * @param  string  $column  The column to count.
+     * @param string $column The column to count.
+     *
      * @return string The complete COUNT SQL query.
      */
     protected function buildCountQuery(string $column = '*'): string
@@ -154,7 +160,8 @@ trait SqlBuilder
     /**
      * Build the INSERT SQL query string.
      *
-     * @param  array<string, mixed>  $data  The data to insert.
+     * @param array<string, mixed> $data The data to insert.
+     *
      * @return string The complete INSERT SQL query.
      */
     protected function buildInsertQuery(array $data): string
@@ -168,7 +175,8 @@ trait SqlBuilder
     /**
      * Build the INSERT BATCH SQL query string.
      *
-     * @param  array<array<string, mixed>>  $data  The data array for batch insert.
+     * @param array<array<string, mixed>> $data The data array for batch insert.
+     *
      * @return string The complete INSERT SQL query.
      *
      * @throws \InvalidArgumentException When data format is invalid.
@@ -191,9 +199,10 @@ trait SqlBuilder
      * Build the UPSERT SQL query string (INSERT with conflict resolution).
      * Now supports both single and batch upserts.
      *
-     * @param  array<string, mixed>|array<array<string, mixed>>  $data  The data to insert/update.
-     * @param  string|array<string>  $uniqueColumns  Column(s) that determine uniqueness.
-     * @param  array<string>|null  $updateColumns  Columns to update on conflict (null = all except unique).
+     * @param array<string, mixed>|array<array<string, mixed>> $data The data to insert/update.
+     * @param string|array<string> $uniqueColumns Column(s) that determine uniqueness.
+     * @param array<string>|null $updateColumns Columns to update on conflict (null = all except unique).
+     *
      * @return string The complete UPSERT SQL query.
      *
      * @throws \InvalidArgumentException When parameters are invalid.
@@ -232,9 +241,10 @@ trait SqlBuilder
      * Build MySQL upsert query using ON DUPLICATE KEY UPDATE.
      * Now supports batch inserts.
      *
-     * @param  array<array<string, mixed>>  $data  The data to insert/update (array of records).
-     * @param  array<string>  $uniqueColumns  Column(s) that determine uniqueness.
-     * @param  array<string>|null  $updateColumns  Columns to update on conflict.
+     * @param array<array<string, mixed>> $data The data to insert/update (array of records).
+     * @param array<string> $uniqueColumns Column(s) that determine uniqueness.
+     * @param array<string>|null $updateColumns Columns to update on conflict.
+     *
      * @return string The MySQL upsert query.
      */
     protected function buildMySqlUpsert(array $data, array $uniqueColumns, ?array $updateColumns): string
@@ -269,9 +279,10 @@ trait SqlBuilder
      * Build PostgreSQL upsert query using ON CONFLICT DO UPDATE.
      * Now supports batch inserts.
      *
-     * @param  array<array<string, mixed>>  $data  The data to insert/update (array of records).
-     * @param  array<string>  $uniqueColumns  Column(s) that determine uniqueness.
-     * @param  array<string>|null  $updateColumns  Columns to update on conflict.
+     * @param array<array<string, mixed>> $data The data to insert/update (array of records).
+     * @param array<string> $uniqueColumns Column(s) that determine uniqueness.
+     * @param array<string>|null $updateColumns Columns to update on conflict.
+     *
      * @return string The PostgreSQL upsert query.
      */
     protected function buildPostgreSqlUpsert(array $data, array $uniqueColumns, ?array $updateColumns): string
@@ -309,9 +320,10 @@ trait SqlBuilder
      * Build SQLite upsert query using ON CONFLICT DO UPDATE.
      * Now supports batch inserts.
      *
-     * @param  array<array<string, mixed>>  $data  The data to insert/update (array of records).
-     * @param  array<string>  $uniqueColumns  Column(s) that determine uniqueness.
-     * @param  array<string>|null  $updateColumns  Columns to update on conflict.
+     * @param array<array<string, mixed>> $data The data to insert/update (array of records).
+     * @param array<string> $uniqueColumns Column(s) that determine uniqueness.
+     * @param array<string>|null $updateColumns Columns to update on conflict.
+     *
      * @return string The SQLite upsert query.
      */
     protected function buildSqliteUpsert(array $data, array $uniqueColumns, ?array $updateColumns): string
@@ -349,9 +361,10 @@ trait SqlBuilder
      * Build SQL Server upsert query using MERGE statement.
      * Now supports batch inserts.
      *
-     * @param  array<array<string, mixed>>  $data  The data to insert/update (array of records).
-     * @param  array<string>  $uniqueColumns  Column(s) that determine uniqueness.
-     * @param  array<string>|null  $updateColumns  Columns to update on conflict.
+     * @param array<array<string, mixed>> $data The data to insert/update (array of records).
+     * @param array<string> $uniqueColumns Column(s) that determine uniqueness.
+     * @param array<string>|null $updateColumns Columns to update on conflict.
+     *
      * @return string The SQL Server upsert query.
      */
     protected function buildSqlServerUpsert(array $data, array $uniqueColumns, ?array $updateColumns): string
@@ -387,7 +400,7 @@ trait SqlBuilder
         }
 
         $sql .= "WHEN NOT MATCHED THEN INSERT ({$columnsStr}) VALUES (" .
-            implode(', ', array_map(fn($col) => "source.{$col}", $columns)) . ');';
+            implode(', ', array_map(fn ($col) => "source.{$col}", $columns)) . ');';
 
         return $sql;
     }
@@ -395,7 +408,8 @@ trait SqlBuilder
     /**
      * Build the UPDATE SQL query string.
      *
-     * @param  array<string, mixed>  $data  The data to update.
+     * @param array<string, mixed> $data The data to update.
+     *
      * @return string The complete UPDATE SQL query.
      */
     protected function buildUpdateQuery(array $data): string
@@ -464,13 +478,13 @@ trait SqlBuilder
             $this->whereRaw
         );
 
-        $filteredAnd = array_filter($andConditions, fn($condition) => trim($condition) !== '');
+        $filteredAnd = array_filter($andConditions, fn ($condition) => trim($condition) !== '');
         if ($filteredAnd !== []) {
             $parts[] = ['conditions' => $filteredAnd, 'operator' => 'AND', 'priority' => 1];
         }
 
         $orConditions = array_merge($this->orWhere, $this->orWhereRaw);
-        $filteredOr = array_filter($orConditions, fn($condition) => trim($condition) !== '');
+        $filteredOr = array_filter($orConditions, fn ($condition) => trim($condition) !== '');
         if ($filteredOr !== []) {
             $parts[] = ['conditions' => $filteredOr, 'operator' => 'OR', 'priority' => 2];
         }
@@ -481,13 +495,14 @@ trait SqlBuilder
     /**
      * Build a group of conditions with the same logical operator.
      *
-     * @param  array<string>  $conditions  Array of condition strings.
-     * @param  string  $operator  The logical operator (AND/OR).
+     * @param array<string> $conditions Array of condition strings.
+     * @param string $operator The logical operator (AND/OR).
+     *
      * @return string The built condition group.
      */
     protected function buildConditionGroup(array $conditions, string $operator): string
     {
-        $filteredConditions = array_filter($conditions, fn($condition) => trim($condition) !== '');
+        $filteredConditions = array_filter($conditions, fn ($condition) => trim($condition) !== '');
 
         if ($filteredConditions === []) {
             return '';
@@ -500,8 +515,9 @@ trait SqlBuilder
     /**
      * Build an aggregate query (MAX, MIN, AVG, SUM, COUNT).
      *
-     * @param  string  $function  The aggregate function name (MAX, MIN, AVG, SUM, COUNT).
-     * @param  string  $column  The column to aggregate.
+     * @param string $function The aggregate function name (MAX, MIN, AVG, SUM, COUNT).
+     * @param string $column The column to aggregate.
+     *
      * @return string The complete SQL query.
      */
     protected function buildAggregateQuery(string $function, string $column): string
@@ -535,7 +551,8 @@ trait SqlBuilder
     /**
      * Combine different condition parts with appropriate logic.
      *
-     * @param  array<array{conditions: array<string>, operator: string, priority: int}>  $parts  Array of condition parts.
+     * @param array<array{conditions: array<string>, operator: string, priority: int}> $parts Array of condition parts.
+     *
      * @return string The combined condition string.
      */
     protected function combineConditionParts(array $parts): string
@@ -544,7 +561,7 @@ trait SqlBuilder
             return '';
         }
 
-        usort($parts, fn($a, $b) => $a['priority'] <=> $b['priority']);
+        usort($parts, fn ($a, $b) => $a['priority'] <=> $b['priority']);
 
         $andParts = [];
         $orParts = [];
@@ -573,8 +590,9 @@ trait SqlBuilder
     /**
      * Combine AND and OR parts with proper precedence.
      *
-     * @param  array<string>  $andParts  AND condition parts.
-     * @param  array<string>  $orParts  OR condition parts.
+     * @param array<string> $andParts AND condition parts.
+     * @param array<string> $orParts OR condition parts.
+     *
      * @return string The combined condition string.
      */
     protected function combineAndOrParts(array $andParts, array $orParts): string

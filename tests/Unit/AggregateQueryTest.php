@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Tests\MockQueryBuilder;
 
 describe('Aggregate Query Tests', function () {
@@ -14,7 +16,8 @@ describe('Aggregate Query Tests', function () {
     test('MIN with WHERE clause', function () {
         $builder = MockQueryBuilder::table('products');
         $sql = $builder->where('status', '=', 'active')
-            ->buildAggregateQuery('MIN', 'price');
+            ->buildAggregateQuery('MIN', 'price')
+        ;
 
         expect($sql)->toBe('SELECT MIN(price) FROM products WHERE status = ?');
     });
@@ -24,7 +27,8 @@ describe('Aggregate Query Tests', function () {
         $sql = $builder
             ->where('status', '=', 'completed')
             ->where('created_at', '>', '2024-01-01')
-            ->buildAggregateQuery('AVG', 'amount');
+            ->buildAggregateQuery('AVG', 'amount')
+        ;
 
         expect($sql)->toBe('SELECT AVG(amount) FROM orders WHERE status = ? AND created_at > ?');
     });
@@ -33,7 +37,8 @@ describe('Aggregate Query Tests', function () {
         $builder = MockQueryBuilder::table('orders');
         $sql = $builder
             ->groupBy('customer_id')
-            ->buildAggregateQuery('SUM', 'total_amount');
+            ->buildAggregateQuery('SUM', 'total_amount')
+        ;
 
         expect($sql)->toBe('SELECT SUM(total_amount) FROM orders GROUP BY customer_id');
     });
@@ -44,7 +49,8 @@ describe('Aggregate Query Tests', function () {
             ->join('customers', 'orders.customer_id = customers.id')
             ->where('orders.status', '=', 'completed')
             ->groupBy('customers.country')
-            ->buildAggregateQuery('AVG', 'orders.amount');
+            ->buildAggregateQuery('AVG', 'orders.amount')
+        ;
 
         expect($sql)->toBe('SELECT AVG(orders.amount) FROM orders INNER JOIN customers ON orders.customer_id = customers.id WHERE orders.status = ? GROUP BY customers.country');
     });
@@ -56,7 +62,8 @@ describe('Aggregate Query Tests', function () {
             ->join('products', 'order_items.product_id = products.id')
             ->where('orders.status', '=', 'completed')
             ->where('products.category', '=', 'electronics')
-            ->buildAggregateQuery('SUM', 'order_items.quantity');
+            ->buildAggregateQuery('SUM', 'order_items.quantity')
+        ;
 
         expect($sql)->toBe('SELECT SUM(order_items.quantity) FROM order_items INNER JOIN orders ON order_items.order_id = orders.id INNER JOIN products ON order_items.product_id = products.id WHERE orders.status = ? AND products.category = ?');
     });
@@ -66,7 +73,8 @@ describe('Aggregate Query Tests', function () {
         $sql = $builder
             ->groupBy('product_id')
             ->havingRaw('SUM(quantity) > 100')
-            ->buildAggregateQuery('MAX', 'price');
+            ->buildAggregateQuery('MAX', 'price')
+        ;
 
         expect($sql)->toBe('SELECT MAX(price) FROM sales GROUP BY product_id HAVING SUM(quantity) > 100');
     });
@@ -75,7 +83,8 @@ describe('Aggregate Query Tests', function () {
         $builder = MockQueryBuilder::table('reviews');
         $sql = $builder
             ->whereIn('product_id', [1, 2, 3, 4, 5])
-            ->buildAggregateQuery('AVG', 'rating');
+            ->buildAggregateQuery('AVG', 'rating')
+        ;
 
         expect($sql)->toBe('SELECT AVG(rating) FROM reviews WHERE product_id IN (?, ?, ?, ?, ?)');
     });
@@ -84,7 +93,8 @@ describe('Aggregate Query Tests', function () {
         $builder = MockQueryBuilder::table('transactions');
         $sql = $builder
             ->whereBetween('created_at', ['2024-01-01', '2024-12-31'])
-            ->buildAggregateQuery('SUM', 'amount');
+            ->buildAggregateQuery('SUM', 'amount')
+        ;
 
         expect($sql)->toBe('SELECT SUM(amount) FROM transactions WHERE created_at BETWEEN ? AND ?');
     });
@@ -93,7 +103,8 @@ describe('Aggregate Query Tests', function () {
         $builder = MockQueryBuilder::table('products');
         $sql = $builder
             ->whereNotNull('discount_price')
-            ->buildAggregateQuery('MIN', 'discount_price');
+            ->buildAggregateQuery('MIN', 'discount_price')
+        ;
 
         expect($sql)->toBe('SELECT MIN(discount_price) FROM products WHERE discount_price IS NOT NULL');
     });
@@ -110,7 +121,8 @@ describe('Aggregate Query Tests', function () {
             ->whereBetween('orders.created_at', ['2024-01-01', '2024-12-31'])
             ->groupBy('products.category')
             ->having('COUNT(*) > 10')
-            ->buildAggregateQuery('SUM', 'order_items.total_price');
+            ->buildAggregateQuery('SUM', 'order_items.total_price')
+        ;
 
         expect($sql)->toContain('SELECT SUM(order_items.total_price)')
             ->toContain('FROM order_items')
@@ -119,7 +131,8 @@ describe('Aggregate Query Tests', function () {
             ->toContain('INNER JOIN customers')
             ->toContain('WHERE orders.status = ?')
             ->toContain('GROUP BY products.category')
-            ->toContain('HAVING COUNT(*) > 10');
+            ->toContain('HAVING COUNT(*) > 10')
+        ;
     });
 
     test('AVG with OR conditions', function () {
@@ -127,12 +140,14 @@ describe('Aggregate Query Tests', function () {
         $sql = $builder
             ->where('category', '=', 'electronics')
             ->orWhere('category', '=', 'computers')
-            ->buildAggregateQuery('AVG', 'price');
+            ->buildAggregateQuery('AVG', 'price')
+        ;
 
         expect($sql)->toContain('SELECT AVG(price)')
             ->toContain('FROM products')
             ->toContain('WHERE')
-            ->toContain('OR');
+            ->toContain('OR')
+        ;
     });
 
     test('MAX with LEFT JOIN', function () {
@@ -140,7 +155,8 @@ describe('Aggregate Query Tests', function () {
         $sql = $builder
             ->leftJoin('reviews', 'products.id = reviews.product_id')
             ->where('products.status', '=', 'active')
-            ->buildAggregateQuery('MAX', 'reviews.rating');
+            ->buildAggregateQuery('MAX', 'reviews.rating')
+        ;
 
         expect($sql)->toBe('SELECT MAX(reviews.rating) FROM products LEFT JOIN reviews ON products.id = reviews.product_id WHERE products.status = ?');
     });
@@ -150,7 +166,8 @@ describe('Aggregate Query Tests', function () {
         $sql = $builder
             ->where('status', '=', 'active')
             ->groupBy('country')
-            ->buildCountQuery();
+            ->buildCountQuery()
+        ;
 
         expect($sql)->toBe('SELECT COUNT(*) FROM users WHERE status = ? GROUP BY country');
     });
@@ -159,7 +176,8 @@ describe('Aggregate Query Tests', function () {
         $builder = MockQueryBuilder::table('prices');
         $sql = $builder
             ->crossJoin('multipliers')
-            ->buildAggregateQuery('SUM', 'prices.amount');
+            ->buildAggregateQuery('SUM', 'prices.amount')
+        ;
 
         expect($sql)->toBe('SELECT SUM(prices.amount) FROM prices CROSS JOIN multipliers');
     });
@@ -169,7 +187,8 @@ describe('Aggregate Query Tests', function () {
         $sql = $builder
             ->setDriver('pgsql')
             ->where('status', '=', 'active')
-            ->buildAggregateQuery('AVG', 'price');
+            ->buildAggregateQuery('AVG', 'price')
+        ;
 
         expect($sql)->toBe('SELECT AVG(price) FROM products WHERE status = ?');
     });
@@ -179,7 +198,8 @@ describe('Aggregate Query Tests', function () {
         $sql = $builder
             ->setDriver('sqlsrv')
             ->where('status', '=', 'active')
-            ->buildAggregateQuery('MAX', 'price');
+            ->buildAggregateQuery('MAX', 'price')
+        ;
 
         expect($sql)->toBe('SELECT MAX(price) FROM products WHERE status = ?');
     });
@@ -195,7 +215,8 @@ describe('Aggregate Query Tests', function () {
         expect($max)->toContain('SELECT MAX(price)')
             ->and($min)->toContain('SELECT MIN(price)')
             ->and($avg)->toContain('SELECT AVG(price)')
-            ->and($sum)->toContain('SELECT SUM(price)');
+            ->and($sum)->toContain('SELECT SUM(price)')
+        ;
     });
 
     test('MIN with RIGHT JOIN', function () {
@@ -203,7 +224,8 @@ describe('Aggregate Query Tests', function () {
         $sql = $builder
             ->rightJoin('categories', 'products.category_id = categories.id')
             ->where('categories.active', '=', true)
-            ->buildAggregateQuery('MIN', 'products.price');
+            ->buildAggregateQuery('MIN', 'products.price')
+        ;
 
         expect($sql)->toBe('SELECT MIN(products.price) FROM products RIGHT JOIN categories ON products.category_id = categories.id WHERE categories.active = ?');
     });
@@ -213,7 +235,8 @@ describe('Aggregate Query Tests', function () {
         $sql = $builder
             ->innerJoin('orders', 'order_items.order_id = orders.id')
             ->where('orders.status', '=', 'paid')
-            ->buildAggregateQuery('SUM', 'order_items.price');
+            ->buildAggregateQuery('SUM', 'order_items.price')
+        ;
 
         expect($sql)->toBe('SELECT SUM(order_items.price) FROM order_items INNER JOIN orders ON order_items.order_id = orders.id WHERE orders.status = ?');
     });
@@ -229,12 +252,14 @@ describe('Aggregate Query Tests', function () {
             ->groupBy('products.id')
             ->groupBy('products.name')
             ->having('SUM(sales.quantity) > 50')
-            ->buildAggregateQuery('SUM', 'sales.total_amount');
+            ->buildAggregateQuery('SUM', 'sales.total_amount')
+        ;
 
         expect($sql)->toContain('SELECT SUM(sales.total_amount)')
             ->toContain('FROM sales')
             ->toContain('GROUP BY products.id, products.name')
-            ->toContain('HAVING SUM(sales.quantity) > 50');
+            ->toContain('HAVING SUM(sales.quantity) > 50')
+        ;
     });
 
     test('aggregate on table without conditions', function () {
@@ -247,7 +272,8 @@ describe('Aggregate Query Tests', function () {
     test('using toSql() for debugging SELECT vs Aggregate', function () {
         $builder = MockQueryBuilder::table('products');
         $builder = $builder->where('status', '=', 'active')
-            ->select(['id', 'name', 'price']);
+            ->select(['id', 'name', 'price'])
+        ;
 
         $selectQuery = $builder->toSql();
         $aggregateQuery = $builder->buildAggregateQuery('MAX', 'price');

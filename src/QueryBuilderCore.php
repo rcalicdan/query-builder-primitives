@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Rcalicdan\QueryBuilderPrimitives;
 
 trait QueryBuilderCore
@@ -41,7 +43,8 @@ trait QueryBuilderCore
     /**
      * Set the table for the query.
      *
-     * @param  string  $table  The table name.
+     * @param string $table The table name.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function table(string $table): static
@@ -55,13 +58,14 @@ trait QueryBuilderCore
     /**
      * Set the columns to select.
      *
-     * @param  string|array<string>  $columns  The columns to select.
+     * @param string|array<string> $columns The columns to select.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function select(string|array $columns = '*'): static
     {
         $instance = clone $this;
-        if (is_string($columns)) {
+        if (\is_string($columns)) {
             $columns = array_map('trim', explode(',', $columns));
         }
         $instance->select = $columns;
@@ -72,13 +76,14 @@ trait QueryBuilderCore
     /**
      * Add columns to the existing select.
      *
-     * @param  string|array<string>  $columns  The columns to add.
+     * @param string|array<string> $columns The columns to add.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function addSelect(string|array $columns): static
     {
         $instance = clone $this;
-        if (is_string($columns)) {
+        if (\is_string($columns)) {
             $columns = array_map('trim', explode(',', $columns));
         }
         $instance->select = array_merge($instance->select, $columns);
@@ -89,7 +94,8 @@ trait QueryBuilderCore
     /**
      * Select distinct records.
      *
-     * @param  string|array<string>  $columns  The columns to select.
+     * @param string|array<string> $columns The columns to select.
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function selectDistinct(string|array $columns = '*'): static
@@ -108,7 +114,8 @@ trait QueryBuilderCore
     /**
      * Set the database driver.
      *
-     * @param  string  $driver  The driver name (mysql, pgsql, sqlsrv, mssql, sqlite)
+     * @param string $driver The driver name (mysql, pgsql, sqlsrv, mssql, sqlite)
+     *
      * @return static Returns a new query builder instance for method chaining.
      */
     public function setDriver(string $driver): static
@@ -146,7 +153,7 @@ trait QueryBuilderCore
      */
     protected function getCompiledBindings(): array
     {
-        if (count($this->conditionOrder) > 0) {
+        if (\count($this->conditionOrder) > 0) {
             $whereBindings = [];
             foreach ($this->conditionOrder as $item) {
                 $whereBindings = array_merge($whereBindings, $item['bindings']);

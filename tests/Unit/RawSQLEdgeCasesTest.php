@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Tests\MockQueryBuilder;
 
 describe('Raw SQL Edge Cases', function () {

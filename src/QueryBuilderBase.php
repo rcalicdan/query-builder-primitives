@@ -1,8 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Rcalicdan\QueryBuilderPrimitives;
 
-/** @phpstan-consistent-constructor */
+/**
+ * @phpstan-consistent-constructor
+ */
 class QueryBuilderBase
 {
     use QueryAdvancedConditions;
