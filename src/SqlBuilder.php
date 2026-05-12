@@ -37,12 +37,10 @@ trait SqlBuilder
             $sql .= ' HAVING ' . implode(' AND ', $this->having);
         }
 
-        // Apply ORDER BY before pagination for SQL Server compatibility
         if ($this->orderBy !== []) {
             $sql .= ' ORDER BY ' . implode(', ', $this->orderBy);
         }
 
-        // Apply database-specific pagination
         $sql = $this->applyPagination($sql);
 
         return $sql;
@@ -57,53 +55,15 @@ trait SqlBuilder
      */
     protected function applyPagination(string $sql): string
     {
-        $driver = $this->getDriver();
-
-        // No pagination needed
         if ($this->limit === null && $this->offset === null) {
             return $sql;
         }
 
-        switch ($driver) {
-            case 'sqlsrv':
-            case 'mssql':
-                return $this->applySqlServerPagination($sql);
-
-            case 'mysql':
-            case 'pgsql':
-            case 'sqlite':
-            default:
-                return $this->applyStandardPagination($sql);
-        }
+        return $this->applyStandardPagination($sql);
     }
 
     /**
-     * Apply SQL Server pagination (OFFSET...FETCH).
-     *
-     * @param string $sql The SQL query string.
-     *
-     * @return string The SQL query with SQL Server pagination.
-     */
-    protected function applySqlServerPagination(string $sql): string
-    {
-        // SQL Server requires ORDER BY for OFFSET/FETCH
-        if ($this->orderBy === [] && ($this->limit !== null || $this->offset !== null)) {
-            // Add a default ORDER BY if none exists
-            $sql .= ' ORDER BY (SELECT NULL)';
-        }
-
-        $offset = $this->offset ?? 0;
-        $sql .= " OFFSET {$offset} ROWS";
-
-        if ($this->limit !== null) {
-            $sql .= " FETCH NEXT {$this->limit} ROWS ONLY";
-        }
-
-        return $sql;
-    }
-
-    /**
-     * Apply standard pagination (LIMIT...OFFSET).
+     * Apply standard pagination (LIMIT...OFFSET) for MySQL, PostgreSQL, and SQLite.
      *
      * @param string $sql The SQL query string.
      *
@@ -197,7 +157,7 @@ trait SqlBuilder
 
     /**
      * Build the UPSERT SQL query string (INSERT with conflict resolution).
-     * Now supports both single and batch upserts.
+     * Supports both single and batch upserts for MySQL, PostgreSQL, and SQLite.
      *
      * @param array<string, mixed>|array<array<string, mixed>> $data The data to insert/update.
      * @param string|array<string> $uniqueColumns Column(s) that determine uniqueness.
@@ -232,14 +192,13 @@ trait SqlBuilder
             'mysql' => $this->buildMySqlUpsert($data, $uniqueColumns, $updateColumns),
             'pgsql' => $this->buildPostgreSqlUpsert($data, $uniqueColumns, $updateColumns),
             'sqlite' => $this->buildSqliteUpsert($data, $uniqueColumns, $updateColumns),
-            'sqlsrv', 'mssql' => $this->buildSqlServerUpsert($data, $uniqueColumns, $updateColumns),
-            default => throw new \InvalidArgumentException("Unsupported driver for upsert: {$driver}"),
+            default => throw new \InvalidArgumentException("Unsupported driver: {$driver}. Supported drivers are mysql, pgsql, and sqlite."),
         };
     }
 
     /**
      * Build MySQL upsert query using ON DUPLICATE KEY UPDATE.
-     * Now supports batch inserts.
+     * Supports batch inserts.
      *
      * @param array<array<string, mixed>> $data The data to insert/update (array of records).
      * @param array<string> $uniqueColumns Column(s) that determine uniqueness.
@@ -277,7 +236,7 @@ trait SqlBuilder
 
     /**
      * Build PostgreSQL upsert query using ON CONFLICT DO UPDATE.
-     * Now supports batch inserts.
+     * Supports batch inserts.
      *
      * @param array<array<string, mixed>> $data The data to insert/update (array of records).
      * @param array<string> $uniqueColumns Column(s) that determine uniqueness.
@@ -318,7 +277,7 @@ trait SqlBuilder
 
     /**
      * Build SQLite upsert query using ON CONFLICT DO UPDATE.
-     * Now supports batch inserts.
+     * Supports batch inserts.
      *
      * @param array<array<string, mixed>> $data The data to insert/update (array of records).
      * @param array<string> $uniqueColumns Column(s) that determine uniqueness.
@@ -353,54 +312,6 @@ trait SqlBuilder
         } else {
             $sql .= ' DO NOTHING';
         }
-
-        return $sql;
-    }
-
-    /**
-     * Build SQL Server upsert query using MERGE statement.
-     * Now supports batch inserts.
-     *
-     * @param array<array<string, mixed>> $data The data to insert/update (array of records).
-     * @param array<string> $uniqueColumns Column(s) that determine uniqueness.
-     * @param array<string>|null $updateColumns Columns to update on conflict.
-     *
-     * @return string The SQL Server upsert query.
-     */
-    protected function buildSqlServerUpsert(array $data, array $uniqueColumns, ?array $updateColumns): string
-    {
-        $firstRow = $data[0];
-        $columns = array_keys($firstRow);
-        $columnsStr = implode(', ', $columns);
-
-        $rowPlaceholders = [];
-        foreach ($data as $row) {
-            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, \count($row), '?')) . ')';
-        }
-        $allPlaceholders = implode(', ', $rowPlaceholders);
-
-        $matchConditions = [];
-        foreach ($uniqueColumns as $column) {
-            $matchConditions[] = "target.{$column} = source.{$column}";
-        }
-        $matchCondition = implode(' AND ', $matchConditions);
-
-        $columnsToUpdate = $updateColumns ?? array_diff($columns, $uniqueColumns);
-
-        $sql = "MERGE INTO {$this->table} AS target ";
-        $sql .= "USING (VALUES {$allPlaceholders}) AS source ({$columnsStr}) ";
-        $sql .= "ON {$matchCondition} ";
-
-        if ($columnsToUpdate !== []) {
-            $updateParts = [];
-            foreach ($columnsToUpdate as $column) {
-                $updateParts[] = "target.{$column} = source.{$column}";
-            }
-            $sql .= 'WHEN MATCHED THEN UPDATE SET ' . implode(', ', $updateParts) . ' ';
-        }
-
-        $sql .= "WHEN NOT MATCHED THEN INSERT ({$columnsStr}) VALUES (" .
-            implode(', ', array_map(fn ($col) => "source.{$col}", $columns)) . ');';
 
         return $sql;
     }
@@ -500,7 +411,6 @@ trait SqlBuilder
             return '';
         }
 
-        // Just join with the operator, no extra parentheses
         return implode(' ' . strtoupper($operator) . ' ', $filteredConditions);
     }
 

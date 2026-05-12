@@ -42,7 +42,7 @@ describe('Database Agnostic Pagination', function () {
                 ->setDriver('mysql')
                 ->where('category', 'electronics')
                 ->orderBy('price', 'ASC')
-                ->forPage(3, 25) // Page 3, 25 per page
+                ->forPage(3, 25)
             ;
 
             $sql = $query->toSql();
@@ -64,128 +64,6 @@ describe('Database Agnostic Pagination', function () {
                 ->toContain('OFFSET 100')
                 ->not->toContain('LIMIT')
                 ->not->toContain('FETCH')
-            ;
-        });
-    });
-
-    describe('SQL Server Syntax', function () {
-
-        it('generates correct OFFSET FETCH syntax for SQL Server', function () {
-            $query = MockQueryBuilder::table('users')
-                ->setDriver('sqlsrv')
-                ->where('status', 'active')
-                ->orderBy('created_at', 'DESC')
-                ->limit(10)
-            ;
-
-            $sql = $query->toSql();
-
-            expect($sql)
-                ->toContain('OFFSET 0 ROWS')
-                ->toContain('FETCH NEXT 10 ROWS ONLY')
-                ->not->toContain('LIMIT')
-            ;
-        });
-
-        it('generates correct OFFSET FETCH with offset for SQL Server', function () {
-            $query = MockQueryBuilder::table('users')
-                ->setDriver('sqlsrv')
-                ->where('status', 'active')
-                ->orderBy('created_at', 'DESC')
-                ->limit(10)
-                ->offset(20)
-            ;
-
-            $sql = $query->toSql();
-
-            expect($sql)
-                ->toContain('OFFSET 20 ROWS')
-                ->toContain('FETCH NEXT 10 ROWS ONLY')
-                ->not->toContain('LIMIT')
-            ;
-        });
-
-        it('auto-adds ORDER BY when missing for SQL Server with LIMIT', function () {
-            $query = MockQueryBuilder::table('products')
-                ->setDriver('sqlsrv')
-                ->where('category', 'electronics')
-                ->limit(25)
-            ;
-
-            $sql = $query->toSql();
-
-            expect($sql)
-                ->toContain('ORDER BY (SELECT NULL)')
-                ->toContain('OFFSET 0 ROWS')
-                ->toContain('FETCH NEXT 25 ROWS ONLY')
-            ;
-        });
-
-        it('auto-adds ORDER BY when missing for SQL Server with OFFSET', function () {
-            $query = MockQueryBuilder::table('orders')
-                ->setDriver('sqlsrv')
-                ->where('status', 'pending')
-                ->offset(50)
-            ;
-
-            $sql = $query->toSql();
-
-            expect($sql)
-                ->toContain('ORDER BY (SELECT NULL)')
-                ->toContain('OFFSET 50 ROWS')
-                ->not->toContain('FETCH') // No LIMIT, so no FETCH
-            ;
-        });
-
-        it('does not add ORDER BY if already present for SQL Server', function () {
-            $query = MockQueryBuilder::table('products')
-                ->setDriver('sqlsrv')
-                ->where('price', '>', 100)
-                ->orderBy('price', 'DESC')
-                ->limit(15)
-            ;
-
-            $sql = $query->toSql();
-
-            expect($sql)
-                ->toContain('ORDER BY price DESC')
-                ->not->toContain('ORDER BY (SELECT NULL)')
-                ->toContain('OFFSET 0 ROWS')
-                ->toContain('FETCH NEXT 15 ROWS ONLY')
-            ;
-        });
-
-        it('generates correct pagination syntax for SQL Server', function () {
-            $query = MockQueryBuilder::table('users')
-                ->setDriver('sqlsrv')
-                ->where('active', 1)
-                ->orderBy('username')
-                ->forPage(3, 20) // Page 3, 20 per page
-            ;
-
-            $sql = $query->toSql();
-
-            expect($sql)
-                ->toContain('OFFSET 40 ROWS') // (3 - 1) * 20 = 40
-                ->toContain('FETCH NEXT 20 ROWS ONLY')
-                ->not->toContain('LIMIT')
-            ;
-        });
-
-        it('handles MSSQL driver alias', function () {
-            $query = MockQueryBuilder::table('users')
-                ->setDriver('mssql')
-                ->where('status', 'active')
-                ->orderBy('id')
-                ->limit(5)
-            ;
-
-            $sql = $query->toSql();
-
-            expect($sql)
-                ->toContain('OFFSET 0 ROWS')
-                ->toContain('FETCH NEXT 5 ROWS ONLY')
-                ->not->toContain('LIMIT')
             ;
         });
     });
@@ -307,9 +185,9 @@ describe('Database Agnostic Pagination', function () {
 
     describe('Complex Queries with Joins', function () {
 
-        it('generates correct SQL Server syntax with joins', function () {
+        it('generates correct MySQL syntax with joins', function () {
             $query = MockQueryBuilder::table('orders')
-                ->setDriver('sqlsrv')
+                ->setDriver('mysql')
                 ->select('orders.*, customers.name')
                 ->leftJoin('customers', 'orders.customer_id = customers.id')
                 ->where('orders.status', 'completed')
@@ -323,15 +201,14 @@ describe('Database Agnostic Pagination', function () {
             expect($sql)
                 ->toContain('LEFT JOIN customers')
                 ->toContain('ORDER BY orders.created_at DESC')
-                ->toContain('OFFSET 0 ROWS')
-                ->toContain('FETCH NEXT 50 ROWS ONLY')
-                ->not->toContain('LIMIT')
+                ->toContain('LIMIT 50')
+                ->not->toContain('FETCH')
             ;
         });
 
-        it('generates correct MySQL syntax with joins', function () {
+        it('generates correct PostgreSQL syntax with joins', function () {
             $query = MockQueryBuilder::table('orders')
-                ->setDriver('mysql')
+                ->setDriver('pgsql')
                 ->select('orders.*, customers.name')
                 ->leftJoin('customers', 'orders.customer_id = customers.id')
                 ->where('orders.status', 'completed')
@@ -354,7 +231,7 @@ describe('Database Agnostic Pagination', function () {
     describe('Edge Cases', function () {
 
         it('handles no pagination for any driver', function () {
-            $drivers = ['mysql', 'sqlsrv', 'pgsql', 'sqlite'];
+            $drivers = ['mysql', 'pgsql', 'sqlite'];
 
             foreach ($drivers as $driver) {
                 $query = MockQueryBuilder::table('users')
@@ -372,7 +249,7 @@ describe('Database Agnostic Pagination', function () {
             }
         });
 
-        it('handles LIMIT 0 for MySQL', function () {
+        it('handles LIMIT 0', function () {
             $query = MockQueryBuilder::table('users')
                 ->setDriver('mysql')
                 ->limit(0)
@@ -380,53 +257,17 @@ describe('Database Agnostic Pagination', function () {
 
             expect($query->toSql())->toContain('LIMIT 0');
         });
-
-        it('handles LIMIT 0 for SQL Server', function () {
-            $query = MockQueryBuilder::table('users')
-                ->setDriver('sqlsrv')
-                ->orderBy('id')
-                ->limit(0)
-            ;
-
-            $sql = $query->toSql();
-
-            expect($sql)
-                ->toContain('OFFSET 0 ROWS')
-                ->toContain('FETCH NEXT 0 ROWS ONLY')
-            ;
-        });
-
-        it('handles only OFFSET without LIMIT for SQL Server', function () {
-            $query = MockQueryBuilder::table('logs')
-                ->setDriver('sqlsrv')
-                ->orderBy('created_at')
-                ->offset(1000)
-            ;
-
-            $sql = $query->toSql();
-
-            expect($sql)
-                ->toContain('OFFSET 1000 ROWS')
-                ->not->toContain('FETCH')
-            ;
-        });
     });
 
     describe('Driver Case Insensitivity', function () {
 
         it('handles uppercase driver names', function () {
             $query = MockQueryBuilder::table('users')
-                ->setDriver('SQLSRV')
-                ->orderBy('id')
+                ->setDriver('MYSQL')
                 ->limit(5)
             ;
 
-            $sql = $query->toSql();
-
-            expect($sql)
-                ->toContain('OFFSET 0 ROWS')
-                ->toContain('FETCH NEXT 5 ROWS ONLY')
-            ;
+            expect($query->toSql())->toContain('LIMIT 5');
         });
 
         it('handles mixed case driver names', function () {
@@ -440,34 +281,6 @@ describe('Database Agnostic Pagination', function () {
     });
 
     describe('Nested Conditions with Pagination', function () {
-
-        it('generates correct SQL Server syntax with nested conditions', function () {
-            $query = MockQueryBuilder::table('products')
-                ->setDriver('sqlsrv')
-                ->whereNested(function ($q) {
-                    return $q->where('category', 'electronics')
-                        ->orWhere('category', 'computers')
-                    ;
-                })
-                ->where('stock', '>', 0)
-                ->orderBy('price', 'ASC')
-                ->limit(20)
-                ->offset(40)
-            ;
-
-            $sql = $query->toSql();
-
-            // The actual order is: stock comes first, then the nested group
-            // This is because of how conditions are tracked and ordered
-            expect($sql)
-                ->toContain('WHERE')
-                ->toContain('stock > ?')
-                ->toContain('category = ?')
-                ->toContain('ORDER BY price ASC')
-                ->toContain('OFFSET 40 ROWS')
-                ->toContain('FETCH NEXT 20 ROWS ONLY')
-            ;
-        });
 
         it('generates correct MySQL syntax with nested conditions', function () {
             $query = MockQueryBuilder::table('products')
@@ -494,28 +307,37 @@ describe('Database Agnostic Pagination', function () {
                 ->toContain('OFFSET 40')
             ;
         });
-    });
 
-    describe('Multiple ORDER BY Clauses', function () {
-
-        it('preserves multiple ORDER BY for SQL Server', function () {
-            $query = MockQueryBuilder::table('users')
-                ->setDriver('sqlsrv')
-                ->orderBy('status', 'ASC')
-                ->orderBy('created_at', 'DESC')
-                ->limit(10)
+        it('generates correct PostgreSQL syntax with nested conditions', function () {
+            $query = MockQueryBuilder::table('products')
+                ->setDriver('pgsql')
+                ->whereNested(function ($q) {
+                    return $q->where('category', 'electronics')
+                        ->orWhere('category', 'computers')
+                    ;
+                })
+                ->where('stock', '>', 0)
+                ->orderBy('price', 'ASC')
+                ->limit(20)
+                ->offset(40)
             ;
 
             $sql = $query->toSql();
 
             expect($sql)
-                ->toContain('ORDER BY status ASC, created_at DESC')
-                ->toContain('OFFSET 0 ROWS')
-                ->toContain('FETCH NEXT 10 ROWS ONLY')
+                ->toContain('WHERE')
+                ->toContain('stock > ?')
+                ->toContain('category = ?')
+                ->toContain('ORDER BY price ASC')
+                ->toContain('LIMIT 20')
+                ->toContain('OFFSET 40')
             ;
         });
+    });
 
-        it('preserves multiple ORDER BY for MySQL', function () {
+    describe('Multiple ORDER BY Clauses', function () {
+
+        it('preserves multiple ORDER BY clauses', function () {
             $query = MockQueryBuilder::table('users')
                 ->setDriver('mysql')
                 ->orderBy('status', 'ASC')
@@ -534,7 +356,7 @@ describe('Database Agnostic Pagination', function () {
 
     describe('Bindings Consistency', function () {
 
-        it('maintains correct binding order for MySQL', function () {
+        it('maintains correct binding order with pagination', function () {
             $query = MockQueryBuilder::table('users')
                 ->setDriver('mysql')
                 ->where('status', 'active')
@@ -543,51 +365,13 @@ describe('Database Agnostic Pagination', function () {
                 ->offset(20)
             ;
 
-            $bindings = $query->getBindings();
-
-            expect($bindings)->toBe(['active', 18]);
-        });
-
-        it('maintains correct binding order for SQL Server', function () {
-            $query = MockQueryBuilder::table('users')
-                ->setDriver('sqlsrv')
-                ->where('status', 'active')
-                ->where('age', '>', 18)
-                ->orderBy('id')
-                ->limit(10)
-                ->offset(20)
-            ;
-
-            $bindings = $query->getBindings();
-
-            expect($bindings)->toBe(['active', 18]);
+            expect($query->getBindings())->toBe(['active', 18]);
         });
     });
 
     describe('Debug Output', function () {
 
-        it('shows correct driver in dump for SQL Server', function () {
-            $query = MockQueryBuilder::table('users')
-                ->setDriver('sqlsrv')
-                ->where('status', 'active')
-                ->limit(10)
-            ;
-
-            ob_start();
-            $query->dump();
-            $output = ob_get_clean();
-
-            // Strip ANSI color codes for testing
-            $cleanOutput = preg_replace('/\x1b\[[0-9;]*m/', '', $output);
-
-            expect($cleanOutput)
-                ->toContain('sqlsrv')
-                ->toContain('OFFSET 0 ROWS')
-                ->toContain('FETCH NEXT 10 ROWS ONLY')
-            ;
-        });
-
-        it('shows correct driver in dump for MySQL', function () {
+        it('shows correct driver in dump output', function () {
             $query = MockQueryBuilder::table('users')
                 ->setDriver('mysql')
                 ->where('status', 'active')
@@ -598,7 +382,6 @@ describe('Database Agnostic Pagination', function () {
             $query->dump();
             $output = ob_get_clean();
 
-            // Strip ANSI color codes for testing
             $cleanOutput = preg_replace('/\x1b\[[0-9;]*m/', '', $output);
 
             expect($cleanOutput)
@@ -607,24 +390,7 @@ describe('Database Agnostic Pagination', function () {
             ;
         });
 
-        it('shows correct raw SQL for SQL Server', function () {
-            $query = MockQueryBuilder::table('users')
-                ->setDriver('sqlsrv')
-                ->where('email', 'test@example.com')
-                ->orderBy('id')
-                ->limit(5)
-            ;
-
-            $rawSql = $query->toRawSql();
-
-            expect($rawSql)
-                ->toContain("'test@example.com'")
-                ->toContain('OFFSET 0 ROWS')
-                ->toContain('FETCH NEXT 5 ROWS ONLY')
-            ;
-        });
-
-        it('shows correct raw SQL for MySQL', function () {
+        it('shows correct raw SQL in debug output', function () {
             $query = MockQueryBuilder::table('users')
                 ->setDriver('mysql')
                 ->where('email', 'test@example.com')
@@ -642,9 +408,9 @@ describe('Database Agnostic Pagination', function () {
 
     describe('Real World Scenarios', function () {
 
-        it('handles user listing with SQL Server', function () {
+        it('handles user listing with pagination', function () {
             $query = MockQueryBuilder::table('users')
-                ->setDriver('sqlsrv')
+                ->setDriver('mysql')
                 ->select('id, username, email, created_at')
                 ->where('active', 1)
                 ->where('verified', 1)
@@ -658,8 +424,8 @@ describe('Database Agnostic Pagination', function () {
                 ->toContain('SELECT id, username, email, created_at')
                 ->toContain('WHERE active = ? AND verified = ?')
                 ->toContain('ORDER BY created_at DESC')
-                ->toContain('OFFSET 0 ROWS')
-                ->toContain('FETCH NEXT 50 ROWS ONLY')
+                ->toContain('LIMIT 50')
+                ->not->toContain('FETCH')
             ;
 
             expect($query->getBindings())->toBe([1, 1]);

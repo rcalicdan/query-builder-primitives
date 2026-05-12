@@ -14,6 +14,11 @@ composer require rcalicdan/query-builder-primitives
 
 This library provides **building blocks**, not a complete query builder. You compose the traits you need to create your own custom query builder implementation.
 
+## Supported Database Drivers
+*   MySQL/MariaDB
+*   PostgreSQL
+*   SQLite
+
 ## Architecture Overview
 
 ### Dependency Map
@@ -671,8 +676,7 @@ $qb->table('orders')
 
 ## Requirements
 
-*   PHP 8.1 or higher
-*   PDO extension (for execution implementations)
+*   PHP 8.2 or higher
 
 ## License
 

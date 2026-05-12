@@ -36,7 +36,7 @@ trait QueryBuilderCore
     protected int $bindingIndex = 0;
 
     /**
-     * @var string|null The database driver name (mysql, pgsql, sqlsrv, sqlite)
+     * @var string|null The database driver name (mysql, pgsql, sqlite)
      */
     protected ?string $driver = null;
 
@@ -114,7 +114,7 @@ trait QueryBuilderCore
     /**
      * Set the database driver.
      *
-     * @param string $driver The driver name (mysql, pgsql, sqlsrv, mssql, sqlite)
+     * @param string $driver The driver name (mysql, pgsql, sqlite)
      *
      * @return static Returns a new query builder instance for method chaining.
      */
