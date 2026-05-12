@@ -72,12 +72,12 @@ trait QueryConditions
      */
     public function where(string $column, mixed $operator = null, mixed $value = null): static
     {
-        if (func_num_args() === 2) {
+        if (\func_num_args() === 2) {
             $value = $operator;
             $operator = '=';
         }
 
-        if (! is_string($operator)) {
+        if (! \is_string($operator)) {
             $operator = '=';
         }
 
@@ -101,12 +101,12 @@ trait QueryConditions
      */
     public function orWhere(string $column, mixed $operator = null, mixed $value = null): static
     {
-        if (func_num_args() === 2) {
+        if (\func_num_args() === 2) {
             $value = $operator;
             $operator = '=';
         }
 
-        if (! is_string($operator)) {
+        if (! \is_string($operator)) {
             $operator = '=';
         }
 
@@ -136,7 +136,7 @@ trait QueryConditions
         $instance = clone $this;
         $placeholders = implode(', ', array_fill(0, \count($values), $instance->getPlaceholder()));
         $instance->whereIn[] = "{$column} IN ({$placeholders})";
-        $instance->bindings['whereIn'] = array_merge($instance->bindings['whereIn'], $values);
+        $instance->bindings['whereIn'] = [...$instance->bindings['whereIn'], ...$values];
         $instance->conditionOrder[] = ['type' => 'and', 'bindings' => $values];
 
         return $instance;
@@ -157,9 +157,9 @@ trait QueryConditions
         }
 
         $instance = clone $this;
-        $placeholders = implode(', ', array_fill(0, count($values), $instance->getPlaceholder()));
+        $placeholders = implode(', ', array_fill(0, \count($values), $instance->getPlaceholder()));
         $instance->whereNotIn[] = "{$column} NOT IN ({$placeholders})";
-        $instance->bindings['whereNotIn'] = array_merge($instance->bindings['whereNotIn'], $values);
+        $instance->bindings['whereNotIn'] = [...$instance->bindings['whereNotIn'], ...$values];
         $instance->conditionOrder[] = ['type' => 'and', 'bindings' => $values];
 
         return $instance;
@@ -177,7 +177,7 @@ trait QueryConditions
      */
     public function whereBetween(string $column, array $values): static
     {
-        if (count($values) !== 2) {
+        if (\count($values) !== 2) {
             throw new \InvalidArgumentException('whereBetween requires exactly 2 values');
         }
 
@@ -292,7 +292,7 @@ trait QueryConditions
     {
         $instance = clone $this;
         $instance->having[] = $condition;
-        $instance->bindings['having'] = array_merge($instance->bindings['having'], $bindings);
+        $instance->bindings['having'] = [...$instance->bindings['having'], ...$bindings];
 
         return $instance;
     }
@@ -312,11 +312,11 @@ trait QueryConditions
 
         if (strtoupper($operator) === 'OR') {
             $instance->orWhereRaw[] = $condition;
-            $instance->bindings['orWhereRaw'] = array_merge($instance->bindings['orWhereRaw'], $bindings);
+            $instance->bindings['orWhereRaw'] = [...$instance->bindings['orWhereRaw'], ...$bindings];
             $instance->conditionOrder[] = ['type' => 'or', 'bindings' => $bindings];
         } else {
             $instance->whereRaw[] = $condition;
-            $instance->bindings['whereRaw'] = array_merge($instance->bindings['whereRaw'], $bindings);
+            $instance->bindings['whereRaw'] = [...$instance->bindings['whereRaw'], ...$bindings];
             $instance->conditionOrder[] = ['type' => 'and', 'bindings' => $bindings];
         }
 

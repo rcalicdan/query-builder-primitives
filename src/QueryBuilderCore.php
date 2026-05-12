@@ -86,7 +86,7 @@ trait QueryBuilderCore
         if (\is_string($columns)) {
             $columns = array_map('trim', explode(',', $columns));
         }
-        $instance->select = array_merge($instance->select, $columns);
+        $instance->select = [...$instance->select, ...$columns];
 
         return $instance;
     }
@@ -156,22 +156,14 @@ trait QueryBuilderCore
         if (\count($this->conditionOrder) > 0) {
             $whereBindings = [];
             foreach ($this->conditionOrder as $item) {
-                $whereBindings = array_merge($whereBindings, $item['bindings']);
+                $whereBindings = [...$whereBindings, ...$item['bindings']];
             }
 
-            return array_merge($whereBindings, $this->bindings['having']);
+            return [...$whereBindings, ...$this->bindings['having']];
         }
 
-        $whereBindings = array_merge(
-            $this->bindings['where'],
-            $this->bindings['whereIn'],
-            $this->bindings['whereNotIn'],
-            $this->bindings['whereBetween'],
-            $this->bindings['whereRaw'],
-            $this->bindings['orWhere'],
-            $this->bindings['orWhereRaw']
-        );
+        $whereBindings = [...$this->bindings['where'], ...$this->bindings['whereIn'], ...$this->bindings['whereNotIn'], ...$this->bindings['whereBetween'], ...$this->bindings['whereRaw'], ...$this->bindings['orWhere'], ...$this->bindings['orWhereRaw']];
 
-        return array_merge($whereBindings, $this->bindings['having']);
+        return [...$whereBindings, ...$this->bindings['having']];
     }
 }

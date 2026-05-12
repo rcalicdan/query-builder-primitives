@@ -283,6 +283,7 @@ describe('Aggregate Query Tests', function () {
             ->toContain('name')
             ->toContain('price')
             ->and($aggregateQuery)->toContain('SELECT MAX(price)')
-            ->and($aggregateQuery)->not->toContain('id, name');
+            ->and($aggregateQuery)->not->toContain('id, name')
+        ;
     });
 });

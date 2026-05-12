@@ -36,10 +36,10 @@ trait QueryGrouping
     public function groupBy(string|array $columns): static
     {
         $instance = clone $this;
-        if (is_string($columns)) {
+        if (\is_string($columns)) {
             $columns = array_map('trim', explode(',', $columns));
         }
-        $instance->groupBy = array_merge($instance->groupBy, $columns);
+        $instance->groupBy = [...$instance->groupBy, ...$columns];
 
         return $instance;
     }

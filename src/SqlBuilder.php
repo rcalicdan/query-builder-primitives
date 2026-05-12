@@ -167,7 +167,7 @@ trait SqlBuilder
     protected function buildInsertQuery(array $data): string
     {
         $columns = implode(', ', array_keys($data));
-        $placeholders = implode(', ', array_fill(0, count($data), '?'));
+        $placeholders = implode(', ', array_fill(0, \count($data), '?'));
 
         return "INSERT INTO {$this->table} ({$columns}) VALUES ({$placeholders})";
     }
@@ -184,13 +184,13 @@ trait SqlBuilder
     protected function buildInsertBatchQuery(array $data): string
     {
         $firstRow = $data[0];
-        if (! is_array($firstRow)) {
+        if (! \is_array($firstRow)) {
             throw new \InvalidArgumentException('Invalid data format for batch insert');
         }
 
         $columns = implode(', ', array_keys($firstRow));
-        $placeholders = '(' . implode(', ', array_fill(0, count($firstRow), '?')) . ')';
-        $allPlaceholders = implode(', ', array_fill(0, count($data), $placeholders));
+        $placeholders = '(' . implode(', ', array_fill(0, \count($firstRow), '?')) . ')';
+        $allPlaceholders = implode(', ', array_fill(0, \count($data), $placeholders));
 
         return "INSERT INTO {$this->table} ({$columns}) VALUES {$allPlaceholders}";
     }
@@ -213,14 +213,14 @@ trait SqlBuilder
             throw new \InvalidArgumentException('Data cannot be empty for upsert');
         }
 
-        $isBatch = is_array(reset($data)) && is_array(reset($data));
+        $isBatch = \is_array(reset($data)) && \is_array(reset($data));
 
         if (! $isBatch) {
             $data = [$data];
         }
 
         /** @var array<array<string, mixed>> $data */
-        $uniqueColumns = is_string($uniqueColumns) ? [$uniqueColumns] : $uniqueColumns;
+        $uniqueColumns = \is_string($uniqueColumns) ? [$uniqueColumns] : $uniqueColumns;
 
         if ($uniqueColumns === []) {
             throw new \InvalidArgumentException('Unique columns must be specified for upsert');
@@ -254,7 +254,7 @@ trait SqlBuilder
 
         $rowPlaceholders = [];
         foreach ($data as $row) {
-            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, count($row), '?')) . ')';
+            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, \count($row), '?')) . ')';
         }
         $allPlaceholders = implode(', ', $rowPlaceholders);
 
@@ -292,7 +292,7 @@ trait SqlBuilder
 
         $rowPlaceholders = [];
         foreach ($data as $row) {
-            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, count($row), '?')) . ')';
+            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, \count($row), '?')) . ')';
         }
         $allPlaceholders = implode(', ', $rowPlaceholders);
 
@@ -333,7 +333,7 @@ trait SqlBuilder
 
         $rowPlaceholders = [];
         foreach ($data as $row) {
-            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, count($row), '?')) . ')';
+            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, \count($row), '?')) . ')';
         }
         $allPlaceholders = implode(', ', $rowPlaceholders);
 
@@ -375,7 +375,7 @@ trait SqlBuilder
 
         $rowPlaceholders = [];
         foreach ($data as $row) {
-            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, count($row), '?')) . ')';
+            $rowPlaceholders[] = '(' . implode(', ', array_fill(0, \count($row), '?')) . ')';
         }
         $allPlaceholders = implode(', ', $rowPlaceholders);
 
@@ -468,22 +468,14 @@ trait SqlBuilder
     {
         $parts = [];
 
-        $andConditions = array_merge(
-            $this->where,
-            $this->whereIn,
-            $this->whereNotIn,
-            $this->whereBetween,
-            $this->whereNull,
-            $this->whereNotNull,
-            $this->whereRaw
-        );
+        $andConditions = [...$this->where, ...$this->whereIn, ...$this->whereNotIn, ...$this->whereBetween, ...$this->whereNull, ...$this->whereNotNull, ...$this->whereRaw];
 
         $filteredAnd = array_filter($andConditions, fn ($condition) => trim($condition) !== '');
         if ($filteredAnd !== []) {
             $parts[] = ['conditions' => $filteredAnd, 'operator' => 'AND', 'priority' => 1];
         }
 
-        $orConditions = array_merge($this->orWhere, $this->orWhereRaw);
+        $orConditions = [...$this->orWhere, ...$this->orWhereRaw];
         $filteredOr = array_filter($orConditions, fn ($condition) => trim($condition) !== '');
         if ($filteredOr !== []) {
             $parts[] = ['conditions' => $filteredOr, 'operator' => 'OR', 'priority' => 2];
@@ -610,7 +602,7 @@ trait SqlBuilder
         if ($andParts !== []) {
             $combinedAnd = implode(' AND ', $andParts);
 
-            if (count($andParts) > 1 || str_contains($combinedAnd, ' AND ')) {
+            if (\count($andParts) > 1 || str_contains($combinedAnd, ' AND ')) {
                 $finalParts[] = '(' . $combinedAnd . ')';
             } else {
                 $finalParts[] = $combinedAnd;
@@ -632,16 +624,8 @@ trait SqlBuilder
     protected function getAllConditions(): array
     {
         return [
-            'AND' => array_merge(
-                $this->where,
-                $this->whereIn,
-                $this->whereNotIn,
-                $this->whereBetween,
-                $this->whereNull,
-                $this->whereNotNull,
-                $this->whereRaw
-            ),
-            'OR' => array_merge($this->orWhere, $this->orWhereRaw),
+            'AND' => [...$this->where, ...$this->whereIn, ...$this->whereNotIn, ...$this->whereBetween, ...$this->whereNull, ...$this->whereNotNull, ...$this->whereRaw],
+            'OR' => [...$this->orWhere, ...$this->orWhereRaw],
         ];
     }
 }

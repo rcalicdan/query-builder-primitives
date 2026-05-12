@@ -109,11 +109,11 @@ trait QueryDebug
         echo $this->highlightSqlCli($sql) . "\n\n";
 
         echo "\033[1;33mBindings:\033[0m\n";
-        if (count($bindings) === 0) {
+        if (\count($bindings) === 0) {
             echo "  (no bindings)\n\n";
         } else {
             foreach ($bindings as $i => $binding) {
-                $type = gettype($binding);
+                $type = \gettype($binding);
                 $value = $this->formatValueForDisplay($binding);
                 echo "  \033[0;32m[$i]\033[0m \033[0;35m($type)\033[0m $value\n";
             }
@@ -155,7 +155,7 @@ trait QueryDebug
         } else {
             echo "<ul style='margin: 5px 0; padding-left: 20px;'>";
             foreach ($bindings as $i => $binding) {
-                $type = gettype($binding);
+                $type = \gettype($binding);
                 $value = htmlspecialchars($this->formatValueForDisplay($binding));
                 echo "<li><span style='color: #50fa7b;'>[$i]</span> ";
                 echo "<span style='color: #bd93f9;'>($type)</span> ";
@@ -298,8 +298,8 @@ trait QueryDebug
      */
     protected function displayBasicStats(): void
     {
-        $bindingCount = count($this->getBindings());
-        $joinCount = count($this->joins);
+        $bindingCount = \count($this->getBindings());
+        $joinCount = \count($this->joins);
         $conditionCount = $this->countConditions();
 
         echo "\033[1;37mStats:\033[0m\n";
@@ -392,7 +392,7 @@ trait QueryDebug
             return '(resource)';
         }
 
-        return '(unknown type: ' . gettype($value) . ')';
+        return '(unknown type: ' . \gettype($value) . ')';
     }
 
     /**
