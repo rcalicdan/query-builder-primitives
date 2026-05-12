@@ -1,3 +1,6 @@
+Here's the updated README with `QueryLocking` fully documented and integrated throughout:
+
+```markdown
 ***
 
 # Query Builder Primitives
@@ -34,6 +37,7 @@ QueryAdvancedConditions (depends on: QueryConditions, SqlBuilder)
 
 QueryJoin (depends on: QueryBuilderCore)
 QueryGrouping (depends on: QueryBuilderCore)
+QueryLocking (depends on: QueryBuilderCore, SqlBuilder)
 QueryDebug (depends on: all traits)
 ```
 
@@ -47,6 +51,7 @@ QueryDebug (depends on: all traits)
 | `QueryAdvancedConditions` | Nested conditions, EXISTS, subqueries | QueryConditions, SqlBuilder |
 | `QueryJoin` | JOIN operations (INNER, LEFT, RIGHT, CROSS) | QueryBuilderCore |
 | `QueryGrouping` | GROUP BY, ORDER BY, LIMIT, OFFSET | QueryBuilderCore |
+| `QueryLocking` | Pessimistic locking (FOR UPDATE, FOR SHARE, NOWAIT, SKIP LOCKED) | QueryBuilderCore, SqlBuilder |
 | `QueryDebug` | Debug utilities (toSql, dump, dd) | All traits |
 
 ## Quick Start
@@ -106,6 +111,7 @@ use Rcalicdan\QueryBuilderPrimitives\{
     QueryAdvancedConditions,
     QueryJoin,
     QueryGrouping,
+    QueryLocking,
     QueryDebug,
     SqlBuilder
 };
@@ -118,6 +124,7 @@ class FullQueryBuilder
     use QueryAdvancedConditions;
     use QueryJoin;
     use QueryGrouping;
+    use QueryLocking;
     use QueryDebug;
     
     public function __construct(?string $table = null)
@@ -161,13 +168,15 @@ table(string $table): static
 select(string|array $columns): static
 addSelect(string|array $columns): static
 selectDistinct(string|array $columns): static
+setDriver(string $driver): static  // 'mysql' | 'pgsql' | 'sqlite'
 ```
 
 **Example:**
 ```php
 $qb->table('users')
     ->select(['id', 'name'])
-    ->addSelect('email');
+    ->addSelect('email')
+    ->setDriver('pgsql');
 ```
 
 ---
@@ -213,9 +222,9 @@ $qb->whereNull('deleted_at')
    ->whereNotNull('email');
 
 // LIKE clauses
-$qb->like('name', 'John', 'both');  // %John%
+$qb->like('name', 'John', 'both');          // %John%
 $qb->like('email', '@gmail.com', 'before'); // %@gmail.com
-$qb->like('username', 'admin', 'after'); // admin%
+$qb->like('username', 'admin', 'after');    // admin%
 
 // Raw WHERE
 $qb->whereRaw('DATE(created_at) = CURDATE()');
@@ -306,7 +315,8 @@ JOIN operations.
 
 **Dependencies:** Requires `QueryBuilderCore`
 
-**Methods:**```php
+**Methods:**
+```php
 join(string $table, string $condition, string $type = 'INNER'): static
 leftJoin(string $table, string $condition): static
 rightJoin(string $table, string $condition): static
@@ -351,7 +361,7 @@ orderByAsc(string $column): static
 orderByDesc(string $column): static
 limit(int $limit, ?int $offset = null): static
 offset(int $offset): static
-paginate(int $page, int $perPage = 15): static
+forPage(int $page, int $perPage = 15): static
 ```
 
 **Examples:**
@@ -379,8 +389,109 @@ $qb->limit(10)
 $qb->limit(10, 20); // LIMIT 10 OFFSET 20
 
 // Pagination helper
-$qb->paginate(2, 25); // Page 2, 25 per page
+$qb->forPage(2, 25); // Page 2, 25 per page
 // Equivalent to: limit(25, 25)
+```
+
+---
+
+### QueryLocking
+
+Pessimistic locking for concurrency control within database transactions.
+
+**Dependencies:** Requires `QueryBuilderCore` and `SqlBuilder`
+
+> **Important:** Lock clauses are only meaningful inside a database transaction. Always wrap locking queries in `BEGIN` / `COMMIT`.
+
+**Methods:**
+```php
+lockForUpdate(): static
+lockForShare(): static
+noWait(): static
+skipLocked(): static
+lockOf(string|array $tables): static   // PostgreSQL only
+withoutLock(): static
+```
+
+#### Driver support matrix
+
+| Feature | MySQL | PostgreSQL | SQLite |
+| :--- | :---: | :---: | :---: |
+| `lockForUpdate()` | ✅ `FOR UPDATE` | ✅ `FOR UPDATE` | ❌ throws |
+| `lockForShare()` | ✅ `LOCK IN SHARE MODE` | ✅ `FOR SHARE` | ❌ throws |
+| `noWait()` on `FOR UPDATE` | ✅ | ✅ | ❌ throws |
+| `noWait()` on `FOR SHARE` | ❌ throws | ✅ | ❌ throws |
+| `skipLocked()` on `FOR UPDATE` | ✅ | ✅ | ❌ throws |
+| `skipLocked()` on `FOR SHARE` | ❌ throws | ✅ | ❌ throws |
+| `lockOf()` | ❌ throws | ✅ | ❌ throws |
+
+> **SQLite note:** SQLite has no row-level locking. Use `BEGIN EXCLUSIVE` or `BEGIN IMMEDIATE` at the connection level instead.
+
+**Examples:**
+```php
+// Exclusive lock — no other transaction can read or modify these rows
+$qb->table('orders')
+    ->where('id', 1)
+    ->lockForUpdate()
+    ->toSql();
+// MySQL/PgSQL: SELECT * FROM orders WHERE id = ? FOR UPDATE
+
+// Shared lock — other transactions can read but not modify
+$qb->table('inventory')
+    ->where('product_id', 42)
+    ->lockForShare()
+    ->toSql();
+// MySQL:  SELECT * FROM inventory WHERE product_id = ? LOCK IN SHARE MODE
+// PgSQL:  SELECT * FROM inventory WHERE product_id = ? FOR SHARE
+
+// Fail immediately if rows are already locked (MySQL 8+ / PostgreSQL)
+$qb->table('orders')
+    ->where('status', 'pending')
+    ->lockForUpdate()
+    ->noWait()
+    ->toSql();
+// SELECT * FROM orders WHERE status = ? FOR UPDATE NOWAIT
+
+// Queue worker pattern — skip rows locked by other workers
+$qb->table('jobs')
+    ->where('status', 'pending')
+    ->orderBy('created_at')
+    ->limit(1)
+    ->lockForUpdate()
+    ->skipLocked()
+    ->toSql();
+// SELECT * FROM jobs WHERE status = ? ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED
+
+// PostgreSQL: lock only the orders table when joining (OF clause)
+$qb->table('orders')
+    ->setDriver('pgsql')
+    ->join('users', 'orders.user_id = users.id')
+    ->lockForUpdate()
+    ->lockOf('orders')
+    ->toSql();
+// SELECT * FROM orders INNER JOIN users ON orders.user_id = users.id FOR UPDATE OF orders
+
+// PostgreSQL: OF with multiple tables
+$qb->table('orders')
+    ->setDriver('pgsql')
+    ->join('items', 'orders.id = items.order_id')
+    ->lockForUpdate()
+    ->lockOf(['orders', 'items'])
+    ->noWait()
+    ->toSql();
+// SELECT * FROM orders INNER JOIN items ON orders.id = items.order_id FOR UPDATE OF orders, items NOWAIT
+
+// Remove a lock from a reused base query
+$base = $qb->table('orders')->lockForUpdate();
+$unlocked = $base->withoutLock();
+```
+
+#### Clause ordering
+
+The lock clause is always appended last, after `LIMIT` / `OFFSET`:
+
+```
+SELECT ... FROM ... JOIN ... WHERE ... GROUP BY ... HAVING ... ORDER BY ... LIMIT ... OFFSET ... <LOCK>
 ```
 
 ---
@@ -412,7 +523,7 @@ echo $sql; // SELECT * FROM users WHERE status = ?
 $bindings = $qb->getBindings();
 var_dump($bindings); // ['active']
 
-// Get interpolated SQL (DEBUG ONLY - never use for execution!)
+// Get interpolated SQL (DEBUG ONLY — never use for execution!)
 $rawSql = $qb->toRawSql();
 echo $rawSql; // SELECT * FROM users WHERE status = 'active'
 
@@ -427,7 +538,6 @@ $qb->table('users')
 $qb->table('users')
     ->where('status', 'active')
     ->dd();
-// Prints debug info and exits
 
 // Debug output includes:
 // - Formatted SQL with syntax highlighting
@@ -469,6 +579,12 @@ $query2 = $baseQuery->where('country', 'US');
 
 // $baseQuery remains unchanged
 // $query1 and $query2 are different queries
+
+// Same applies to locks
+$base   = $qb->table('orders')->where('status', 'pending');
+$locked = $base->lockForUpdate();
+
+// $base has no lock, $locked does
 ```
 
 ## Extending with Execution
@@ -559,6 +675,21 @@ $users = $qb->table('users')
     ->orderBy('created_at', 'DESC')
     ->limit(10)
     ->get();
+
+// With locking inside a transaction
+$pdo->beginTransaction();
+
+$job = $qb->table('jobs')
+    ->where('status', 'pending')
+    ->orderBy('created_at')
+    ->limit(1)
+    ->lockForUpdate()
+    ->skipLocked()
+    ->first();
+
+// process $job ...
+
+$pdo->commit();
 ```
 
 ## Recommended Compositions
@@ -614,6 +745,7 @@ class ComplexQueryBuilder
     use QueryAdvancedConditions;
     use QueryJoin;
     use QueryGrouping;
+    use QueryLocking;
     use QueryDebug;
 }
 ```
@@ -655,6 +787,49 @@ $qb->table('users')
     });
 ```
 
+### Pessimistic Locking Patterns
+
+```php
+// Payment processing — hold rows exclusively while charging
+$pdo->beginTransaction();
+
+$order = $qb->table('orders')
+    ->where('id', $orderId)
+    ->where('status', 'pending')
+    ->lockForUpdate()
+    ->first();
+
+if ($order) {
+    // safe to charge — no other process can touch this row
+}
+
+$pdo->commit();
+
+// Job queue — multiple workers each claim one job without colliding
+$pdo->beginTransaction();
+
+$job = $qb->table('jobs')
+    ->where('status', 'available')
+    ->orderBy('priority', 'DESC')
+    ->orderBy('created_at')
+    ->limit(1)
+    ->lockForUpdate()
+    ->skipLocked()   // other workers skip this row instead of waiting
+    ->first();
+
+$pdo->commit();
+
+// Inventory check — read-consistent snapshot while others can still read
+$pdo->beginTransaction();
+
+$stock = $qb->table('inventory')
+    ->where('product_id', $productId)
+    ->lockForShare()
+    ->first();
+
+$pdo->commit();
+```
+
 ### Reporting Queries
 
 ```php
@@ -684,4 +859,5 @@ MIT
 
 ## Contributing
 
-This is a primitive library - keep it simple and focused on building blocks, not opinions.
+This is a primitive library, keep it simple and focused on building blocks, not opinions.
+```
