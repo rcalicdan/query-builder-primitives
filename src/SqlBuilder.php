@@ -43,6 +43,11 @@ trait SqlBuilder
 
         $sql = $this->applyPagination($sql);
 
+        $lockClause = $this->buildLockClause();
+        if ($lockClause !== '') {
+            $sql .= ' ' . $lockClause;
+        }
+
         return $sql;
     }
 

@@ -10,6 +10,7 @@ use Rcalicdan\QueryBuilderPrimitives\QueryConditions;
 use Rcalicdan\QueryBuilderPrimitives\QueryDebug;
 use Rcalicdan\QueryBuilderPrimitives\QueryGrouping;
 use Rcalicdan\QueryBuilderPrimitives\QueryJoin;
+use Rcalicdan\QueryBuilderPrimitives\QueryLocking;
 use Rcalicdan\QueryBuilderPrimitives\SqlBuilder;
 
 class MockQueryBuilder
@@ -20,6 +21,7 @@ class MockQueryBuilder
     use QueryDebug;
     use QueryGrouping;
     use QueryJoin;
+    use QueryLocking;
     use SqlBuilder {
         buildAggregateQuery as protected traitBuildAggregateQuery;
         buildCountQuery as protected traitBuildCountQuery;
