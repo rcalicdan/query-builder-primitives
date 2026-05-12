@@ -143,7 +143,12 @@ trait SqlBuilder
      */
     protected function buildInsertBatchQuery(array $data): string
     {
-        $firstRow = $data[0];
+        if ($data === []) {
+            throw new \InvalidArgumentException('Invalid data format for batch insert');
+        }
+
+        $firstRow = reset($data);
+
         if (! \is_array($firstRow)) {
             throw new \InvalidArgumentException('Invalid data format for batch insert');
         }
