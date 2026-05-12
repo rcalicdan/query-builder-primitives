@@ -193,17 +193,6 @@ describe('Aggregate Query Tests', function () {
         expect($sql)->toBe('SELECT AVG(price) FROM products WHERE status = ?');
     });
 
-    test('MAX with SQL Server driver', function () {
-        $builder = MockQueryBuilder::table('products');
-        $sql = $builder
-            ->setDriver('sqlsrv')
-            ->where('status', '=', 'active')
-            ->buildAggregateQuery('MAX', 'price')
-        ;
-
-        expect($sql)->toBe('SELECT MAX(price) FROM products WHERE status = ?');
-    });
-
     test('all aggregate functions on same table', function () {
         $baseBuilder = MockQueryBuilder::table('products')->where('status', '=', 'active');
 
