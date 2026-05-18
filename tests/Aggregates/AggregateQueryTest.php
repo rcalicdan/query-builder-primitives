@@ -261,7 +261,7 @@ describe('Aggregate Query Tests', function () {
     test('using toSql() for debugging SELECT vs Aggregate', function () {
         $builder = MockQueryBuilder::table('products');
         $builder = $builder->where('status', '=', 'active')
-            ->select(['id', 'name', 'price'])
+            ->select('id', 'name', 'price')
         ;
 
         $selectQuery = $builder->toSql();

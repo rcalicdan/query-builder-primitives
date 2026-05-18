@@ -13,24 +13,24 @@ describe('QueryBuilderCore', function () {
 
     test('sets select columns', function () {
         $query = MockQueryBuilder::table('users')
-            ->select(['id', 'name', 'email'])
+            ->select('id', 'name', 'email')
         ;
 
         expect($query->toSql())->toBe('SELECT id, name, email FROM users');
     });
 
-    test('sets select columns from string', function () {
+    test('defaults to wildcard when no columns provided', function () {
         $query = MockQueryBuilder::table('users')
-            ->select('id, name, email')
+            ->select()
         ;
 
-        expect($query->toSql())->toBe('SELECT id, name, email FROM users');
+        expect($query->toSql())->toBe('SELECT * FROM users');
     });
 
     test('adds select columns', function () {
         $query = MockQueryBuilder::table('users')
             ->select('id')
-            ->addSelect(['name', 'email'])
+            ->addSelect('name', 'email')
         ;
 
         expect($query->toSql())->toBe('SELECT id, name, email FROM users');
@@ -46,7 +46,7 @@ describe('QueryBuilderCore', function () {
 
     test('selects distinct with multiple columns', function () {
         $query = MockQueryBuilder::table('users')
-            ->selectDistinct(['name', 'email'])
+            ->selectDistinct('name', 'email')
         ;
 
         expect($query->toSql())->toContain('DISTINCT name');

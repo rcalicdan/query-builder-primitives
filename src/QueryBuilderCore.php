@@ -58,34 +58,28 @@ trait QueryBuilderCore
     /**
      * Set the columns to select.
      *
-     * @param string|array<string> $columns The columns to select.
+     * @param string ...$columns The columns to select. Omit to select all columns (*).
      *
      * @return static Returns a new query builder instance for method chaining.
      */
-    public function select(string|array $columns = '*'): static
+    public function select(string ...$columns): static
     {
         $instance = clone $this;
-        if (\is_string($columns)) {
-            $columns = array_map('trim', explode(',', $columns));
-        }
-        $instance->select = $columns;
-
+        $instance->select = \count($columns) === 0 ? ['*'] : array_values($columns);
+        
         return $instance;
     }
 
     /**
      * Add columns to the existing select.
      *
-     * @param string|array<string> $columns The columns to add.
+     * @param string ...$columns The columns to add.
      *
      * @return static Returns a new query builder instance for method chaining.
      */
-    public function addSelect(string|array $columns): static
+    public function addSelect(string ...$columns): static
     {
         $instance = clone $this;
-        if (\is_string($columns)) {
-            $columns = array_map('trim', explode(',', $columns));
-        }
         $instance->select = [...$instance->select, ...$columns];
 
         return $instance;
@@ -94,19 +88,14 @@ trait QueryBuilderCore
     /**
      * Select distinct records.
      *
-     * @param string|array<string> $columns The columns to select.
+     * @param string ...$columns The columns to select. Omit to select all columns (*).
      *
      * @return static Returns a new query builder instance for method chaining.
      */
-    public function selectDistinct(string|array $columns = '*'): static
+    public function selectDistinct(string ...$columns): static
     {
-        $instance = $this->select($columns);
-
-        if ($instance->select !== [] && $instance->select[0] !== '*') {
-            $instance->select[0] = 'DISTINCT '.$instance->select[0];
-        } elseif ($instance->select[0] === '*') {
-            $instance->select[0] = 'DISTINCT *';
-        }
+        $instance = $this->select(...$columns);
+        $instance->select[0] = 'DISTINCT ' . $instance->select[0];
 
         return $instance;
     }

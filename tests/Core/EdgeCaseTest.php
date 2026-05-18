@@ -14,7 +14,7 @@ describe('Edge Cases', function () {
     test('handles very long column lists', function () {
         $columns = array_map(fn ($i) => "column{$i}", range(1, 50));
         $query = MockQueryBuilder::table('users')
-            ->select($columns)
+            ->select(...$columns)
         ;
 
         expect($query->toSql())->toContain('column1');
