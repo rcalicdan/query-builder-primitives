@@ -112,13 +112,6 @@ trait QueryLocking
             );
         }
 
-        if ($this->getDriver() === 'mysql') {
-            throw new \LogicException(
-                'MySQL does not support the OF clause for locking. '
-                    . 'This feature is only available on PostgreSQL.'
-            );
-        }
-
         $instance = clone $this;
         $instance->lockOf = \is_string($tables) ? [$tables] : $tables;
 
@@ -173,18 +166,13 @@ trait QueryLocking
             return '';
         }
 
-        if ($this->lockModifier !== null && $this->lockMode === 'FOR SHARE') {
-            throw new \LogicException(
-                "MySQL does not support the {$this->lockModifier} modifier with LOCK IN SHARE MODE. "
-                    . 'Use lockForUpdate() if you need NOWAIT or SKIP LOCKED.'
-            );
-        }
-
         $clause = $this->lockMode === 'FOR SHARE'
             ? 'LOCK IN SHARE MODE'
             : 'FOR UPDATE';
 
-        if ($this->lockModifier !== null) {
+        // MySQL does not support NOWAIT or SKIP LOCKED with LOCK IN SHARE MODE.
+        // It silently ignores the modifier in this case for graceful degradation.
+        if ($this->lockModifier !== null && $this->lockMode !== 'FOR SHARE') {
             $clause .= ' ' . $this->lockModifier;
         }
 
@@ -221,15 +209,10 @@ trait QueryLocking
      * SQLite has very limited locking support; only FOR UPDATE is approximated.
      * Modifiers and OF are silently ignored as SQLite handles concurrency at the file level.
      *
-     * @return never Never returns a value.
-     *
-     * @throws \LogicException SQLite does not support row-level locking.
+     * @return string Empty string as SQLite ignores row-level locking.
      */
-    protected function buildSqliteLockClause(): never
+    protected function buildSqliteLockClause(): string
     {
-        throw new \LogicException(
-            'SQLite does not support row-level locking. '
-                . 'Use transactions (BEGIN EXCLUSIVE / BEGIN IMMEDIATE) at the connection level instead.'
-        );
+        return '';
     }
 }

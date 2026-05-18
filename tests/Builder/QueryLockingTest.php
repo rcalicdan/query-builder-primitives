@@ -41,24 +41,28 @@ describe('QueryLocking', function () {
             expect($sql)->toBe('SELECT * FROM orders WHERE status = ? FOR UPDATE NOWAIT');
         });
 
-        test('lockForShare with noWait throws on MySQL', function () {
-            expect(
-                fn () => MockQueryBuilder::table('orders')
-                    ->setDriver('mysql')
-                    ->lockForShare()
-                    ->noWait()
-                    ->toSql()
-            )->toThrow(LogicException::class, 'LOCK IN SHARE MODE');
+        test('lockForShare ignores noWait on MySQL (graceful degradation)', function () {
+            $sql = MockQueryBuilder::table('orders')
+                ->setDriver('mysql')
+                ->lockForShare()
+                ->noWait()
+                ->toSql()
+            ;
+
+            expect($sql)->toBe('SELECT * FROM orders LOCK IN SHARE MODE');
+            expect($sql)->not->toContain('NOWAIT');
         });
 
-        test('lockForShare with skipLocked throws on MySQL', function () {
-            expect(
-                fn () => MockQueryBuilder::table('orders')
-                    ->setDriver('mysql')
-                    ->lockForShare()
-                    ->skipLocked()
-                    ->toSql()
-            )->toThrow(LogicException::class, 'LOCK IN SHARE MODE');
+        test('lockForShare ignores skipLocked on MySQL (graceful degradation)', function () {
+            $sql = MockQueryBuilder::table('orders')
+                ->setDriver('mysql')
+                ->lockForShare()
+                ->skipLocked()
+                ->toSql()
+            ;
+
+            expect($sql)->toBe('SELECT * FROM orders LOCK IN SHARE MODE');
+            expect($sql)->not->toContain('SKIP LOCKED');
         });
     });
 
@@ -291,34 +295,41 @@ describe('QueryLocking', function () {
         });
     });
 
-    describe('SQLite throws on any lock', function () {
-        test('lockForUpdate throws LogicException on SQLite', function () {
-            expect(
-                fn () => MockQueryBuilder::table('orders')
-                    ->setDriver('sqlite')
-                    ->lockForUpdate()
-                    ->toSql()
-            )->toThrow(LogicException::class, 'SQLite does not support row-level locking');
+    describe('SQLite ignores lock modes', function () {
+        test('lockForUpdate is a no-op on SQLite', function () {
+            $sql = MockQueryBuilder::table('orders')
+                ->setDriver('sqlite')
+                ->lockForUpdate()
+                ->toSql()
+            ;
+
+            expect($sql)->toBe('SELECT * FROM orders');
+            expect($sql)->not->toContain('FOR UPDATE');
         });
 
-        test('lockForShare throws LogicException on SQLite', function () {
-            expect(
-                fn () => MockQueryBuilder::table('orders')
-                    ->setDriver('sqlite')
-                    ->lockForShare()
-                    ->toSql()
-            )->toThrow(LogicException::class, 'SQLite does not support row-level locking');
+        test('lockForShare is a no-op on SQLite', function () {
+            $sql = MockQueryBuilder::table('orders')
+                ->setDriver('sqlite')
+                ->lockForShare()
+                ->toSql()
+            ;
+
+            expect($sql)->toBe('SELECT * FROM orders');
+            expect($sql)->not->toContain('FOR SHARE');
         });
     });
 
-    describe('MySQL rejects OF clause', function () {
-        test('lockOf throws LogicException on MySQL', function () {
-            expect(
-                fn () => MockQueryBuilder::table('orders')
-                    ->setDriver('mysql')
-                    ->lockForUpdate()
-                    ->lockOf('orders')
-            )->toThrow(LogicException::class, 'MySQL does not support the OF clause');
+    describe('MySQL ignores OF clause', function () {
+        test('lockOf is a no-op on MySQL', function () {
+            $sql = MockQueryBuilder::table('orders')
+                ->setDriver('mysql')
+                ->lockForUpdate()
+                ->lockOf('orders')
+                ->toSql()
+            ;
+
+            expect($sql)->toBe('SELECT * FROM orders FOR UPDATE');
+            expect($sql)->not->toContain('OF orders');
         });
     });
 
