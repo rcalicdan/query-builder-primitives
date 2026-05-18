@@ -20,6 +20,7 @@ trait QueryBuilderCore
      * @var array<string, array<mixed>> The parameter bindings for the query, grouped by type.
      */
     protected array $bindings = [
+        'select' => [],
         'where' => [],
         'whereIn' => [],
         'whereNotIn' => [],
@@ -66,7 +67,8 @@ trait QueryBuilderCore
     {
         $instance = clone $this;
         $instance->select = \count($columns) === 0 ? ['*'] : array_values($columns);
-        
+        $instance->bindings['select'] = [];
+
         return $instance;
     }
 
@@ -81,6 +83,35 @@ trait QueryBuilderCore
     {
         $instance = clone $this;
         $instance->select = [...$instance->select, ...$columns];
+
+        return $instance;
+    }
+
+    /**
+     * Add a raw select expression to the query.
+     *
+     * @param string $expression The raw SQL expression.
+     * @param array<mixed> $bindings Parameter bindings for the expression.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     *
+     * @throws \InvalidArgumentException When named bindings are provided.
+     */
+    public function selectRaw(string $expression, array $bindings = []): static
+    {
+        if ($bindings !== [] && ! array_is_list($bindings)) {
+            throw new \InvalidArgumentException('Query builder primitives only support positional bindings. Named bindings are not allowed.');
+        }
+
+        $instance = clone $this;
+
+        if ($instance->select === ['*']) {
+            $instance->select = [$expression];
+        } else {
+            $instance->select[] = $expression;
+        }
+
+        $instance->bindings['select'] = [...$instance->bindings['select'], ...$bindings];
 
         return $instance;
     }
@@ -148,11 +179,11 @@ trait QueryBuilderCore
                 $whereBindings = [...$whereBindings, ...$item['bindings']];
             }
 
-            return [...$whereBindings, ...$this->bindings['having']];
+            return [...$this->bindings['select'], ...$whereBindings, ...$this->bindings['having']];
         }
 
         $whereBindings = [...$this->bindings['where'], ...$this->bindings['whereIn'], ...$this->bindings['whereNotIn'], ...$this->bindings['whereBetween'], ...$this->bindings['whereRaw'], ...$this->bindings['orWhere'], ...$this->bindings['orWhereRaw']];
 
-        return [...$whereBindings, ...$this->bindings['having']];
+        return [...$this->bindings['select'], ...$whereBindings, ...$this->bindings['having']];
     }
 }

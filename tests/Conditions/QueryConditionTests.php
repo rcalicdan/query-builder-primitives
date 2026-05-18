@@ -69,4 +69,40 @@ describe('QueryConditions Tests', function () {
         expect($resetQuery->getBindings())->toBeEmpty();
         expect($resetQuery->toSql())->toBe('SELECT * FROM users');
     });
+
+    test('whereColumn compares two columns without bindings', function () {
+        $query = MockQueryBuilder::table('users')
+            ->where('status', 'active') 
+            ->whereColumn('created_at', 'updated_at') 
+            ->whereColumn('first_name', '!=', 'last_name'); 
+            
+        $sql = $query->toSql();
+        
+        expect($sql)->toContain('WHERE status = ? AND created_at = updated_at AND first_name != last_name');
+        
+        expect($query->getBindings())->toBe(['active']);
+    });
+
+    test('orWhereColumn wrapper generates correct OR clause without bindings', function () {
+        $query = MockQueryBuilder::table('users')
+            ->where('status', 'active')
+            ->orWhereColumn('is_admin', 'is_super_admin')
+            ->orWhereColumn('login_count', '>', 'view_count');
+            
+        $sql = $query->toSql();
+        
+        expect($sql)->toContain('WHERE status = ? OR is_admin = is_super_admin OR login_count > view_count');
+        expect($query->getBindings())->toBe(['active']);
+    });
+
+    test('whereColumn accepts boolean parameter dynamically', function () {
+        $query = MockQueryBuilder::table('users')
+            ->where('status', 'active')
+            ->whereColumn('published_at', '<', 'expires_at', 'OR'); 
+            
+        $sql = $query->toSql();
+        
+        expect($sql)->toContain('WHERE status = ? OR published_at < expires_at');
+        expect($query->getBindings())->toBe(['active']);
+    });
 });

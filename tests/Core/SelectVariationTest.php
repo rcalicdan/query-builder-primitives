@@ -40,4 +40,34 @@ describe('Select Variations', function () {
 
         expect($query->toSql())->toBe('SELECT id, name, email, phone, address FROM users');
     });
+
+    test('selectRaw replaces wildcard and adds bindings in correct order', function () {
+        $query = MockQueryBuilder::table('users')
+            ->selectRaw('SUM(price * ?) as total', [1.2])
+            ->where('status', 'active')
+        ;
+
+        expect($query->toSql())->toBe('SELECT SUM(price * ?) as total FROM users WHERE status = ?');
+        expect($query->getBindings())->toBe([1.2, 'active']);
+    });
+
+    test('selectRaw appends to existing select', function () {
+        $query = MockQueryBuilder::table('users')
+            ->select('id', 'name')
+            ->selectRaw('COUNT(orders.id) > ? as has_orders', [5])
+        ;
+
+        expect($query->toSql())->toBe('SELECT id, name, COUNT(orders.id) > ? as has_orders FROM users');
+        expect($query->getBindings())->toBe([5]);
+    });
+
+    test('select clears existing select bindings', function () {
+        $query = MockQueryBuilder::table('users')
+            ->selectRaw('SUM(price * ?) as total', [1.2])
+            ->select('id', 'name')
+        ;
+
+        expect($query->toSql())->toBe('SELECT id, name FROM users');
+        expect($query->getBindings())->toBe([]);
+    });
 });

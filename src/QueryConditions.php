@@ -287,9 +287,15 @@ trait QueryConditions
      * @param array<mixed> $bindings Parameter bindings for the condition.
      *
      * @return static Returns a new query builder instance for method chaining.
+     *
+     * @throws \InvalidArgumentException When named bindings are provided.
      */
     public function havingRaw(string $condition, array $bindings = []): static
     {
+        if ($bindings !== [] && ! array_is_list($bindings)) {
+            throw new \InvalidArgumentException('Query builder primitives only support positional bindings. Named bindings are not allowed.');
+        }
+
         $instance = clone $this;
         $instance->having[] = $condition;
         $instance->bindings['having'] = [...$instance->bindings['having'], ...$bindings];
@@ -305,9 +311,15 @@ trait QueryConditions
      * @param string $operator Logical operator ('AND' or 'OR').
      *
      * @return static Returns a new query builder instance for method chaining.
+     *
+     * @throws \InvalidArgumentException When named bindings are provided.
      */
     public function whereRaw(string $condition, array $bindings = [], string $operator = 'AND'): static
     {
+        if ($bindings !== [] && ! array_is_list($bindings)) {
+            throw new \InvalidArgumentException('Query builder primitives only support positional bindings. Named bindings are not allowed.');
+        }
+
         $instance = clone $this;
 
         if (strtoupper($operator) === 'OR') {
@@ -334,6 +346,55 @@ trait QueryConditions
     public function orWhereRaw(string $condition, array $bindings = []): static
     {
         return $this->whereRaw($condition, $bindings, 'OR');
+    }
+
+    /**
+     * Add a WHERE clause that compares two columns.
+     *
+     * @param string $first The first column name.
+     * @param string|null $operator The comparison operator or second column if only 2 arguments.
+     * @param string|null $second The second column name.
+     * @param string $boolean The logical operator ('AND' or 'OR').
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function whereColumn(string $first, ?string $operator = null, ?string $second = null, string $boolean = 'AND'): static
+    {
+        // Support 2-argument signature: whereColumn('created_at', 'updated_at')
+        if (\func_num_args() === 2) {
+            $second = $operator;
+            $operator = '=';
+        }
+
+        $operator = (string) $operator;
+        $second = (string) $second;
+
+        $instance = clone $this;
+        $condition = "{$first} {$operator} {$second}";
+
+        if (strtoupper($boolean) === 'OR') {
+            $instance->orWhere[] = $condition;
+            $instance->conditionOrder[] = ['type' => 'or', 'bindings' => []];
+        } else {
+            $instance->where[] = $condition;
+            $instance->conditionOrder[] = ['type' => 'and', 'bindings' => []];
+        }
+
+        return $instance;
+    }
+
+    /**
+     * Add an OR WHERE clause that compares two columns.
+     *
+     * @param string $first The first column name.
+     * @param string|null $operator The comparison operator or second column if only 2 arguments.
+     * @param string|null $second The second column name.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function orWhereColumn(string $first, ?string $operator = null, ?string $second = null): static
+    {
+        return $this->whereColumn($first, $operator, $second, 'OR');
     }
 
     /**
