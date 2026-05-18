@@ -44,7 +44,6 @@ trait SqlBuilder
             }
         }
 
-
         if ($this->orderBy !== []) {
             $sql .= ' ORDER BY ' . implode(', ', $this->orderBy);
         }
@@ -399,13 +398,13 @@ trait SqlBuilder
 
         $andConditions = [...$this->where, ...$this->whereIn, ...$this->whereNotIn, ...$this->whereBetween, ...$this->whereNull, ...$this->whereNotNull, ...$this->whereRaw];
 
-        $filteredAnd = array_filter($andConditions, fn($condition) => trim($condition) !== '');
+        $filteredAnd = array_filter($andConditions, fn ($condition) => trim($condition) !== '');
         if ($filteredAnd !== []) {
             $parts[] = ['conditions' => $filteredAnd, 'operator' => 'AND', 'priority' => 1];
         }
 
         $orConditions = [...$this->orWhere, ...$this->orWhereRaw];
-        $filteredOr = array_filter($orConditions, fn($condition) => trim($condition) !== '');
+        $filteredOr = array_filter($orConditions, fn ($condition) => trim($condition) !== '');
         if ($filteredOr !== []) {
             $parts[] = ['conditions' => $filteredOr, 'operator' => 'OR', 'priority' => 2];
         }
@@ -423,7 +422,7 @@ trait SqlBuilder
      */
     protected function buildConditionGroup(array $conditions, string $operator): string
     {
-        $filteredConditions = array_filter($conditions, fn($condition) => trim($condition) !== '');
+        $filteredConditions = array_filter($conditions, fn ($condition) => trim($condition) !== '');
 
         if ($filteredConditions === []) {
             return '';
@@ -481,7 +480,7 @@ trait SqlBuilder
             return '';
         }
 
-        usort($parts, fn($a, $b) => $a['priority'] <=> $b['priority']);
+        usort($parts, fn ($a, $b) => $a['priority'] <=> $b['priority']);
 
         $andParts = [];
         $orParts = [];

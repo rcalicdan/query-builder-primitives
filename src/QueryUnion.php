@@ -22,8 +22,8 @@ trait QueryUnion
     public function union(callable $callback, bool $all = false): static
     {
         $subBuilder = new static();
-        
-        if (is_callable([$this, 'getDriver']) && is_callable([$subBuilder, 'setDriver'])) {
+
+        if (\is_callable([$this, 'getDriver']) && \is_callable([$subBuilder, 'setDriver'])) {
             $driver = $this->getDriver();
             $subBuilder = $subBuilder->setDriver($driver);
         }
@@ -31,14 +31,14 @@ trait QueryUnion
         $subBuilder = $callback($subBuilder);
 
         $hasTable = property_exists($subBuilder, 'table') && $subBuilder->table !== null && $subBuilder->table !== '';
-        
+
         if (! $hasTable) {
             throw new \InvalidArgumentException('Union query must specify a table using table() method.');
         }
 
         $instance = clone $this;
-        
-        if (! is_callable([$subBuilder, 'buildSelectQuery'])) {
+
+        if (! \is_callable([$subBuilder, 'buildSelectQuery'])) {
             throw new \LogicException('The query builder must use the SqlBuilder trait to compile a union.');
         }
 
@@ -47,7 +47,7 @@ trait QueryUnion
             'all' => $all,
         ];
 
-        if (! is_callable([$subBuilder, 'getCompiledBindings'])) {
+        if (! \is_callable([$subBuilder, 'getCompiledBindings'])) {
             throw new \LogicException('The query builder must use the QueryBuilderCore trait to compile bindings.');
         }
 

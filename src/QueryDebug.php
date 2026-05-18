@@ -4,6 +4,24 @@ declare(strict_types=1);
 
 namespace Rcalicdan\QueryBuilderPrimitives;
 
+/**
+ * @property string $table
+ * @property array<int, array{type: string, table: string, condition: string}> $joins
+ * @property int|null $limit
+ * @property int|null $offset
+ * @property array<int, string> $where
+ * @property array<int, string> $orWhere
+ * @property array<int, string> $whereIn
+ * @property array<int, string> $whereNotIn
+ * @property array<int, string> $whereBetween
+ * @property array<int, string> $whereNull
+ * @property array<int, string> $whereNotNull
+ * @property array<int, string> $whereRaw
+ * @property array<int, string> $orWhereRaw
+ * @method string buildSelectQuery()
+ * @method array<mixed> getCompiledBindings()
+ * @method string getDriver()
+ */
 trait QueryDebug
 {
     /**
@@ -41,9 +59,21 @@ trait QueryDebug
             return $sql;
         }
 
-        foreach ($bindings as $binding) {
+        foreach ($bindings as $index => $binding) {
             $value = $this->formatValueForDisplay($binding);
-            $result = preg_replace('/\?/', $value, $sql, 1);
+
+            // Wrap math in parentheses to ensure correct concatenation priority
+            $pgPattern = '/\$' . ($index + 1) . '(?!\d)/';
+
+            // Explicitly compare preg_match result to 1 to satisfy boolean requirement
+            if (preg_match($pgPattern, $sql) === 1) {
+                // Postgres bindings can be reused multiple times in a query, so it replace ALL matches
+                $result = preg_replace_callback($pgPattern, fn () => $value, $sql);
+            } else {
+                // Standard '?' placeholder, replace only the FIRST occurrence
+                $result = preg_replace_callback('/\?/', fn () => $value, $sql, 1);
+            }
+
             if ($result !== null) {
                 $sql = $result;
             }
@@ -183,41 +213,11 @@ trait QueryDebug
     protected function highlightSqlCli(string $sql): string
     {
         $keywords = [
-            'SELECT',
-            'FROM',
-            'WHERE',
-            'JOIN',
-            'INNER',
-            'LEFT',
-            'RIGHT',
-            'OUTER',
-            'GROUP BY',
-            'ORDER BY',
-            'HAVING',
-            'LIMIT',
-            'OFFSET',
-            'FETCH',
-            'NEXT',
-            'ROWS',
-            'ONLY',
-            'AND',
-            'OR',
-            'IN',
-            'NOT',
-            'IS',
-            'NULL',
-            'LIKE',
-            'BETWEEN',
-            'EXISTS',
-            'DISTINCT',
-            'COUNT',
-            'SUM',
-            'AVG',
-            'MIN',
-            'MAX',
-            'INSERT',
-            'UPDATE',
-            'DELETE',
+            'SELECT', 'FROM', 'WHERE', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'OUTER',
+            'CROSS', 'UNION', 'ALL', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT',
+            'OFFSET', 'FETCH', 'NEXT', 'ROWS', 'ONLY', 'AND', 'OR', 'IN', 'NOT',
+            'IS', 'NULL', 'LIKE', 'BETWEEN', 'EXISTS', 'DISTINCT', 'COUNT', 'SUM',
+            'AVG', 'MIN', 'MAX', 'INSERT', 'UPDATE', 'DELETE',
         ];
 
         $highlighted = $sql;
@@ -241,41 +241,11 @@ trait QueryDebug
     protected function highlightSqlWeb(string $sql): string
     {
         $keywords = [
-            'SELECT',
-            'FROM',
-            'WHERE',
-            'JOIN',
-            'INNER',
-            'LEFT',
-            'RIGHT',
-            'OUTER',
-            'GROUP BY',
-            'ORDER BY',
-            'HAVING',
-            'LIMIT',
-            'OFFSET',
-            'FETCH',
-            'NEXT',
-            'ROWS',
-            'ONLY',
-            'AND',
-            'OR',
-            'IN',
-            'NOT',
-            'IS',
-            'NULL',
-            'LIKE',
-            'BETWEEN',
-            'EXISTS',
-            'DISTINCT',
-            'COUNT',
-            'SUM',
-            'AVG',
-            'MIN',
-            'MAX',
-            'INSERT',
-            'UPDATE',
-            'DELETE',
+            'SELECT', 'FROM', 'WHERE', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'OUTER',
+            'CROSS', 'UNION', 'ALL', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT',
+            'OFFSET', 'FETCH', 'NEXT', 'ROWS', 'ONLY', 'AND', 'OR', 'IN', 'NOT',
+            'IS', 'NULL', 'LIKE', 'BETWEEN', 'EXISTS', 'DISTINCT', 'COUNT', 'SUM',
+            'AVG', 'MIN', 'MAX', 'INSERT', 'UPDATE', 'DELETE',
         ];
 
         $highlighted = htmlspecialchars($sql);
@@ -299,12 +269,12 @@ trait QueryDebug
     protected function displayBasicStats(): void
     {
         $bindingCount = \count($this->getBindings());
-        $joinCount = \count($this->joins);
+        $joinCount = \count($this->joins); // Removed property_exists (PHPStan knows it's true)
         $conditionCount = $this->countConditions();
 
         echo "\033[1;37mStats:\033[0m\n";
         echo "  Table: \033[0;36m{$this->table}\033[0m\n";
-        echo "  Driver: \033[0;36m{$this->getDriver()}\033[0m\n";
+        echo "  Driver: \033[0;36m{$this->getDriver()}\033[0m\n"; // Removed method_exists
         echo "  Bindings: \033[0;33m$bindingCount\033[0m\n";
         echo "  Joins: \033[0;33m$joinCount\033[0m\n";
         echo "  Conditions: \033[0;33m$conditionCount\033[0m\n";
@@ -400,14 +370,18 @@ trait QueryDebug
      */
     protected function countConditions(): int
     {
-        return \count($this->where) +
-            \count($this->orWhere) +
-            \count($this->whereIn) +
-            \count($this->whereNotIn) +
-            \count($this->whereBetween) +
-            \count($this->whereNull) +
-            \count($this->whereNotNull) +
-            \count($this->whereRaw) +
-            \count($this->orWhereRaw);
+        $count = 0;
+
+        $count += \count($this->where);
+        $count += \count($this->orWhere);
+        $count += \count($this->whereIn);
+        $count += \count($this->whereNotIn);
+        $count += \count($this->whereBetween);
+        $count += \count($this->whereNull);
+        $count += \count($this->whereNotNull);
+        $count += \count($this->whereRaw);
+        $count += \count($this->orWhereRaw);
+
+        return $count;
     }
 }

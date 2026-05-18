@@ -184,7 +184,7 @@ trait QueryBuilderCore
                 ...$this->bindings['select'],
                 ...$whereBindings,
                 ...$this->bindings['having'],
-                ...$this->bindings['union']
+                ...$this->bindings['union'],
             ];
         }
 
@@ -195,14 +195,14 @@ trait QueryBuilderCore
             ...$this->bindings['whereBetween'],
             ...$this->bindings['whereRaw'],
             ...$this->bindings['orWhere'],
-            ...$this->bindings['orWhereRaw']
+            ...$this->bindings['orWhereRaw'],
         ];
 
         return [
             ...$this->bindings['select'],
             ...$whereBindings,
             ...$this->bindings['having'],
-            ...$this->bindings['union']
+            ...$this->bindings['union'],
         ];
     }
 }
