@@ -29,6 +29,7 @@ trait QueryBuilderCore
         'orWhere' => [],
         'orWhereRaw' => [],
         'having' => [],
+        'union' => [],
     ];
 
     /**
@@ -179,11 +180,29 @@ trait QueryBuilderCore
                 $whereBindings = [...$whereBindings, ...$item['bindings']];
             }
 
-            return [...$this->bindings['select'], ...$whereBindings, ...$this->bindings['having']];
+            return [
+                ...$this->bindings['select'],
+                ...$whereBindings,
+                ...$this->bindings['having'],
+                ...$this->bindings['union']
+            ];
         }
 
-        $whereBindings = [...$this->bindings['where'], ...$this->bindings['whereIn'], ...$this->bindings['whereNotIn'], ...$this->bindings['whereBetween'], ...$this->bindings['whereRaw'], ...$this->bindings['orWhere'], ...$this->bindings['orWhereRaw']];
+        $whereBindings = [
+            ...$this->bindings['where'],
+            ...$this->bindings['whereIn'],
+            ...$this->bindings['whereNotIn'],
+            ...$this->bindings['whereBetween'],
+            ...$this->bindings['whereRaw'],
+            ...$this->bindings['orWhere'],
+            ...$this->bindings['orWhereRaw']
+        ];
 
-        return [...$this->bindings['select'], ...$whereBindings, ...$this->bindings['having']];
+        return [
+            ...$this->bindings['select'],
+            ...$whereBindings,
+            ...$this->bindings['having'],
+            ...$this->bindings['union']
+        ];
     }
 }

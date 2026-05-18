@@ -11,6 +11,7 @@ use Rcalicdan\QueryBuilderPrimitives\QueryDebug;
 use Rcalicdan\QueryBuilderPrimitives\QueryGrouping;
 use Rcalicdan\QueryBuilderPrimitives\QueryJoin;
 use Rcalicdan\QueryBuilderPrimitives\QueryLocking;
+use Rcalicdan\QueryBuilderPrimitives\QueryUnion;
 use Rcalicdan\QueryBuilderPrimitives\SqlBuilder;
 
 class MockQueryBuilder
@@ -22,6 +23,7 @@ class MockQueryBuilder
     use QueryGrouping;
     use QueryJoin;
     use QueryLocking;
+    use QueryUnion;
     use SqlBuilder {
         buildAggregateQuery as protected traitBuildAggregateQuery;
         buildCountQuery as protected traitBuildCountQuery;

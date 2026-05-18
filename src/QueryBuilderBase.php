@@ -16,5 +16,6 @@ class QueryBuilderBase
     use QueryGrouping;
     use QueryJoin;
     use QueryLocking;
+    use QueryUnion;
     use SqlBuilder;
 }
