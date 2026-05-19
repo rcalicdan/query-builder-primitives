@@ -135,7 +135,7 @@ trait QueryBuilderCore
     /**
      * Set the database driver.
      *
-     * @internal This method is used internally for subquery driver propagation. 
+     * @internal This method is used internally for subquery driver propagation.
      *           Concrete implementations should manage driver configuration internally.
      *
      * @param string $driver The driver name (mysql, pgsql, sqlite)
@@ -184,12 +184,12 @@ trait QueryBuilderCore
     {
         try {
             return new static();
-        } catch (\ArgumentCountError $e) {
+        } catch (\ArgumentCountError $e) { // @phpstan-ignore catch.neverThrown (this error is expected to be thrown in runtime)
             throw new \LogicException(
-                sprintf(
+                \sprintf(
                     'Cannot instantiate subquery builder for class "%s". ' .
-                    'Because your constructor requires arguments, you must override the ' .
-                    'protected `newQuery(): static` method in your class to manually pass your dependencies.',
+                        'Because your constructor requires arguments, you must override the ' .
+                        'protected `newQuery(): static` method in your class to manually pass your dependencies.',
                     static::class
                 ),
                 0,

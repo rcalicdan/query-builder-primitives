@@ -17,7 +17,7 @@ trait QueryAdvancedConditions
     public function whereGroup(callable $callback, string $logicalOperator = 'AND'): static
     {
         $subBuilder = $this->newQuery();
-        
+
         if ($this->table !== '') {
             $subBuilder = $subBuilder->from($this->table);
         }
