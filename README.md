@@ -1,8 +1,3 @@
-Here's the updated README with `QueryLocking` fully documented and integrated throughout:
-
-```markdown
-***
-
 # Query Builder Primitives
 
 A collection of PHP traits for building immutable, fluent query builders. This library provides low-level primitives without forcing any specific implementation.
@@ -38,6 +33,7 @@ QueryAdvancedConditions (depends on: QueryConditions, SqlBuilder)
 QueryJoin (depends on: QueryBuilderCore)
 QueryGrouping (depends on: QueryBuilderCore)
 QueryLocking (depends on: QueryBuilderCore, SqlBuilder)
+QueryUnion (depends on: QueryBuilderCore, SqlBuilder)
 QueryDebug (depends on: all traits)
 ```
 
@@ -52,6 +48,7 @@ QueryDebug (depends on: all traits)
 | `QueryJoin` | JOIN operations (INNER, LEFT, RIGHT, CROSS) | QueryBuilderCore |
 | `QueryGrouping` | GROUP BY, ORDER BY, LIMIT, OFFSET | QueryBuilderCore |
 | `QueryLocking` | Pessimistic locking (FOR UPDATE, FOR SHARE, NOWAIT, SKIP LOCKED) | QueryBuilderCore, SqlBuilder |
+| `QueryUnion` | UNION and UNION ALL operations | QueryBuilderCore, SqlBuilder |
 | `QueryDebug` | Debug utilities (toSql, dump, dd) | All traits |
 
 ## Quick Start
@@ -86,7 +83,7 @@ class QueryBuilder
 // Usage
 $qb = new QueryBuilder();
 $sql = $qb->table('users')
-    ->select('id, name, email')
+    ->select('id', 'name', 'email')
     ->where('status', 'active')
     ->where('age', '>=', 18)
     ->toSql();
@@ -112,6 +109,7 @@ use Rcalicdan\QueryBuilderPrimitives\{
     QueryJoin,
     QueryGrouping,
     QueryLocking,
+    QueryUnion,
     QueryDebug,
     SqlBuilder
 };
@@ -125,6 +123,7 @@ class FullQueryBuilder
     use QueryJoin;
     use QueryGrouping;
     use QueryLocking;
+    use QueryUnion;
     use QueryDebug;
     
     public function __construct(?string $table = null)
@@ -138,7 +137,7 @@ class FullQueryBuilder
 // Usage with advanced features
 $qb = new FullQueryBuilder();
 $qb->table('users')
-    ->select('users.*, orders.total')
+    ->select('users.*', 'orders.total')
     ->leftJoin('orders', 'orders.user_id = users.id')
     ->whereGroup(function($query) {
         return $query
@@ -165,18 +164,37 @@ Foundation trait providing core functionality.
 **Methods:**
 ```php
 table(string $table): static
-select(string|array $columns): static
-addSelect(string|array $columns): static
-selectDistinct(string|array $columns): static
-setDriver(string $driver): static  // 'mysql' | 'pgsql' | 'sqlite'
+from(string $table): static             // alias for table()
+select(string ...$columns): static
+addSelect(string ...$columns): static
+selectRaw(string $expression, array $bindings = []): static
+selectDistinct(string ...$columns): static
+setDriver(string $driver): static       // 'mysql' | 'pgsql' | 'sqlite'
 ```
 
-**Example:**
+**Examples:**
 ```php
+// Basic select
 $qb->table('users')
-    ->select(['id', 'name'])
+    ->select('id', 'name')
     ->addSelect('email')
     ->setDriver('pgsql');
+
+// Select all (default)
+$qb->table('users')->select();
+
+// Raw expression in select
+$qb->table('orders')
+    ->select('user_id')
+    ->selectRaw('SUM(total) as total_spent')
+    ->selectRaw('COUNT(*) as order_count');
+
+// Select with raw bindings
+$qb->table('products')
+    ->selectRaw('CASE WHEN price > ? THEN ? ELSE ? END as tier', [100, 'premium', 'standard']);
+
+// DISTINCT
+$qb->table('users')->selectDistinct('country');
 ```
 
 ---
@@ -194,6 +212,8 @@ whereNotIn(string $column, array $values): static
 whereBetween(string $column, array $values): static
 whereNull(string $column): static
 whereNotNull(string $column): static
+whereColumn(string $first, ?string $operator, ?string $second, string $boolean = 'AND'): static
+orWhereColumn(string $first, ?string $operator, ?string $second): static
 like(string $column, string $value, string $side = 'both'): static
 having(string $column, mixed $operator, mixed $value): static
 havingRaw(string $condition, array $bindings = []): static
@@ -220,6 +240,11 @@ $qb->whereBetween('age', [18, 65]);
 // NULL checks
 $qb->whereNull('deleted_at')
    ->whereNotNull('email');
+
+// Column-to-column comparison (no binding, no injection risk)
+$qb->whereColumn('created_at', 'updated_at');           // created_at = updated_at
+$qb->whereColumn('price', '>', 'discounted_price');     // price > discounted_price
+$qb->orWhereColumn('verified_at', 'created_at');        // OR verified_at = created_at
 
 // LIKE clauses
 $qb->like('name', 'John', 'both');          // %John%
@@ -367,7 +392,8 @@ forPage(int $page, int $perPage = 15): static
 **Examples:**
 ```php
 // GROUP BY
-$qb->select('user_id, COUNT(*) as total')
+$qb->select('user_id')
+    ->selectRaw('COUNT(*) as total')
     ->groupBy('user_id');
 
 // Multiple GROUP BY
@@ -417,13 +443,13 @@ withoutLock(): static
 
 | Feature | MySQL | PostgreSQL | SQLite |
 | :--- | :---: | :---: | :---: |
-| `lockForUpdate()` | ✅ `FOR UPDATE` | ✅ `FOR UPDATE` | ❌ throws |
-| `lockForShare()` | ✅ `LOCK IN SHARE MODE` | ✅ `FOR SHARE` | ❌ throws |
-| `noWait()` on `FOR UPDATE` | ✅ | ✅ | ❌ throws |
-| `noWait()` on `FOR SHARE` | ❌ throws | ✅ | ❌ throws |
-| `skipLocked()` on `FOR UPDATE` | ✅ | ✅ | ❌ throws |
-| `skipLocked()` on `FOR SHARE` | ❌ throws | ✅ | ❌ throws |
-| `lockOf()` | ❌ throws | ✅ | ❌ throws |
+| `lockForUpdate()` | ✅ `FOR UPDATE` | ✅ `FOR UPDATE` | ❌ ignored |
+| `lockForShare()` | ✅ `LOCK IN SHARE MODE` | ✅ `FOR SHARE` | ❌ ignored |
+| `noWait()` on `FOR UPDATE` | ✅ | ✅ | ❌ ignored |
+| `noWait()` on `FOR SHARE` | ❌ silently ignored | ✅ | ❌ ignored |
+| `skipLocked()` on `FOR UPDATE` | ✅ | ✅ | ❌ ignored |
+| `skipLocked()` on `FOR SHARE` | ❌ silently ignored | ✅ | ❌ ignored |
+| `lockOf()` | ❌ throws | ✅ | ❌ ignored |
 
 > **SQLite note:** SQLite has no row-level locking. Use `BEGIN EXCLUSIVE` or `BEGIN IMMEDIATE` at the connection level instead.
 
@@ -496,6 +522,91 @@ SELECT ... FROM ... JOIN ... WHERE ... GROUP BY ... HAVING ... ORDER BY ... LIMI
 
 ---
 
+### QueryUnion
+
+UNION and UNION ALL operations.
+
+**Dependencies:** Requires `QueryBuilderCore` and `SqlBuilder`
+
+**Methods:**
+```php
+union(callable $callback, bool $all = false): static
+unionAll(callable $callback): static
+```
+
+**Examples:**
+```php
+// Basic UNION (deduplicates rows)
+$qb->table('active_users')
+    ->select('id', 'name', 'email')
+    ->union(function($query) {
+        return $query
+            ->table('archived_users')
+            ->select('id', 'name', 'email');
+    })
+    ->toSql();
+// SELECT id, name, email FROM active_users
+// UNION SELECT id, name, email FROM archived_users
+
+// UNION ALL (keeps duplicate rows)
+$qb->table('orders_2023')
+    ->select('id', 'total', 'created_at')
+    ->unionAll(function($query) {
+        return $query
+            ->table('orders_2024')
+            ->select('id', 'total', 'created_at');
+    })
+    ->orderBy('created_at', 'DESC')
+    ->toSql();
+// SELECT id, total, created_at FROM orders_2023
+// UNION ALL SELECT id, total, created_at FROM orders_2024
+// ORDER BY created_at DESC
+
+// Chaining multiple UNIONs
+$qb->table('employees')
+    ->select('id', 'name', 'department')
+    ->where('active', true)
+    ->union(function($query) {
+        return $query
+            ->table('contractors')
+            ->select('id', 'name', 'department')
+            ->where('active', true);
+    })
+    ->union(function($query) {
+        return $query
+            ->table('interns')
+            ->select('id', 'name', 'department');
+    })
+    ->orderBy('name')
+    ->toSql();
+// SELECT id, name, department FROM employees WHERE active = ?
+// UNION SELECT id, name, department FROM contractors WHERE active = ?
+// UNION SELECT id, name, department FROM interns
+// ORDER BY name ASC
+
+// UNION with conditions and bindings
+$qb->table('products')
+    ->select('id', 'name', 'price')
+    ->where('category', 'electronics')
+    ->unionAll(function($query) {
+        return $query
+            ->table('products')
+            ->select('id', 'name', 'price')
+            ->where('category', 'accessories')
+            ->where('price', '<', 50);
+    })
+    ->toSql();
+// SELECT id, name, price FROM products WHERE category = ?
+// UNION ALL SELECT id, name, price FROM products WHERE category = ? AND price < ?
+
+$bindings = $qb->getBindings();
+// ['electronics', 'accessories', 50]
+```
+
+> **Note:** `ORDER BY`, `LIMIT`, and `OFFSET` placed on the outer query apply to the full union result set. Column counts and types must match across all unioned queries.
+
+---
+
 ### QueryDebug
 
 Debugging utilities.
@@ -563,6 +674,8 @@ buildInsertBatchQuery(array $data): string
 buildUpdateQuery(array $data): string
 buildDeleteQuery(): string
 buildWhereClause(): string
+buildAggregateQuery(string $function, string $column): string
+buildUpsertQuery(array $data, string|array $uniqueColumns, ?array $updateColumns = null): string
 ```
 
 > **Note:** These are protected methods intended for internal use or for extending the query builder with execution methods.
@@ -580,11 +693,12 @@ $query2 = $baseQuery->where('country', 'US');
 // $baseQuery remains unchanged
 // $query1 and $query2 are different queries
 
-// Same applies to locks
+// Same applies to locks and unions
 $base   = $qb->table('orders')->where('status', 'pending');
 $locked = $base->lockForUpdate();
+$union  = $base->union(fn($q) => $q->table('archived_orders'));
 
-// $base has no lock, $locked does
+// $base has no lock and no union; $locked and $union are independent forks
 ```
 
 ## Extending with Execution
@@ -704,6 +818,7 @@ class ReadOnlyQueryBuilder
     use QueryConditions;
     use QueryJoin;
     use QueryGrouping;
+    use QueryUnion;
     use QueryDebug;
 }
 ```
@@ -730,6 +845,7 @@ class ReportingQueryBuilder
     use QueryConditions;
     use QueryJoin;
     use QueryGrouping;
+    use QueryUnion;
     use QueryDebug;
 }
 ```
@@ -746,6 +862,7 @@ class ComplexQueryBuilder
     use QueryJoin;
     use QueryGrouping;
     use QueryLocking;
+    use QueryUnion;
     use QueryDebug;
 }
 ```
@@ -765,6 +882,35 @@ $qb->table('users')
         return $q->where('status', 'pending')
                  ->where('invited', true);
     });
+```
+
+### Column Comparison Patterns
+
+```php
+// Rows where updated_at is more recent than created_at
+$qb->table('users')
+    ->whereColumn('updated_at', '>', 'created_at');
+
+// Rows where a value matches its mirror column
+$qb->table('audit_log')
+    ->whereColumn('expected_hash', 'actual_hash')   // two-arg shorthand, defaults to =
+    ->orWhereColumn('verified_at', 'created_at');
+```
+
+### selectRaw Patterns
+
+```php
+// Conditional expression
+$qb->table('orders')
+    ->select('id', 'user_id')
+    ->selectRaw('SUM(total) as total_spent')
+    ->selectRaw('COUNT(*) as order_count')
+    ->selectRaw('MAX(total) as largest_order')
+    ->groupBy('user_id');
+
+// Parameterised raw expression
+$qb->table('products')
+    ->selectRaw('CASE WHEN stock > ? THEN ? ELSE ? END as availability', [0, 'in_stock', 'out_of_stock']);
 ```
 
 ### Subquery Patterns
@@ -830,16 +976,39 @@ $stock = $qb->table('inventory')
 $pdo->commit();
 ```
 
+### UNION Patterns
+
+```php
+// Combine results from partitioned tables
+$qb->table('logs_2024')
+    ->select('id', 'user_id', 'action', 'created_at')
+    ->unionAll(function($q) {
+        return $q->table('logs_2025')
+                 ->select('id', 'user_id', 'action', 'created_at');
+    })
+    ->orderBy('created_at', 'DESC')
+    ->limit(100);
+
+// Merge different record types into a single feed
+$qb->table('posts')
+    ->select('id', 'title', 'created_at')
+    ->selectRaw("'post' as type")
+    ->union(function($q) {
+        return $q->table('comments')
+                 ->select('id', 'body as title', 'created_at')
+                 ->selectRaw("'comment' as type");
+    })
+    ->orderBy('created_at', 'DESC');
+```
+
 ### Reporting Queries
 
 ```php
 $qb->table('orders')
-    ->select([
-        'users.name',
-        'COUNT(orders.id) as total_orders',
-        'SUM(orders.total) as total_spent',
-        'AVG(orders.total) as avg_order'
-    ])
+    ->select('users.name')
+    ->selectRaw('COUNT(orders.id) as total_orders')
+    ->selectRaw('SUM(orders.total) as total_spent')
+    ->selectRaw('AVG(orders.total) as avg_order')
     ->leftJoin('users', 'users.id = orders.user_id')
     ->where('orders.status', 'completed')
     ->whereBetween('orders.created_at', ['2024-01-01', '2024-12-31'])
@@ -860,4 +1029,3 @@ MIT
 ## Contributing
 
 This is a primitive library, keep it simple and focused on building blocks, not opinions.
-```
