@@ -124,4 +124,39 @@ describe('QueryAdvancedConditions', function () {
 
         expect($query->toSql())->toContain('WHERE user_count > (SELECT COUNT(*) FROM orders)');
     });
+
+    test('propagates database driver to subqueries', function () {
+        $query = MockQueryBuilder::table('users')
+            ->setDriver('pgsql')
+            ->whereExists(function ($query) {
+                return $query
+                    ->from('orders')
+                    ->where('user_id', 'users.id')
+                    ->lockForShare()
+                ;
+            })
+        ;
+
+        $sql = $query->toSql();
+
+        expect($sql)->toContain('FOR SHARE');
+        expect($sql)->not->toContain('LOCK IN SHARE MODE');
+    });
+
+    test('propagates database driver to whereSub queries', function () {
+        $query = MockQueryBuilder::table('users')
+            ->setDriver('sqlite')
+            ->whereSub('total', '>', function ($query) {
+                return $query
+                    ->from('orders')
+                    ->select('amount')
+                    ->lockForUpdate()
+                ;
+            })
+        ;
+
+        $sql = $query->toSql();
+
+        expect($sql)->not->toContain('FOR UPDATE');
+    });
 });

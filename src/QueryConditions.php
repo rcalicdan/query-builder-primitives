@@ -57,7 +57,7 @@ trait QueryConditions
     protected array $having = [];
 
     /**
-     * @var array<array{type: string, bindings: array<mixed>}> Track condition order
+     * @var array<array{type: string, sql: string, bindings: array<mixed>}> Track condition order
      */
     protected array $conditionOrder = [];
 
@@ -83,9 +83,11 @@ trait QueryConditions
 
         $instance = clone $this;
         $placeholder = $instance->getPlaceholder();
-        $instance->where[] = "{$column} {$operator} {$placeholder}";
+        $sql = "{$column} {$operator} {$placeholder}";
+
+        $instance->where[] = $sql;
         $instance->bindings['where'][] = $value;
-        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => [$value]];
+        $instance->conditionOrder[] = ['type' => 'and', 'sql' => $sql, 'bindings' => [$value]];
 
         return $instance;
     }
@@ -112,9 +114,11 @@ trait QueryConditions
 
         $instance = clone $this;
         $placeholder = $instance->getPlaceholder();
-        $instance->orWhere[] = "{$column} {$operator} {$placeholder}";
+        $sql = "{$column} {$operator} {$placeholder}";
+
+        $instance->orWhere[] = $sql;
         $instance->bindings['orWhere'][] = $value;
-        $instance->conditionOrder[] = ['type' => 'or', 'bindings' => [$value]];
+        $instance->conditionOrder[] = ['type' => 'or', 'sql' => $sql, 'bindings' => [$value]];
 
         return $instance;
     }
@@ -135,9 +139,11 @@ trait QueryConditions
 
         $instance = clone $this;
         $placeholders = implode(', ', array_fill(0, \count($values), $instance->getPlaceholder()));
-        $instance->whereIn[] = "{$column} IN ({$placeholders})";
+        $sql = "{$column} IN ({$placeholders})";
+
+        $instance->whereIn[] = $sql;
         $instance->bindings['whereIn'] = [...$instance->bindings['whereIn'], ...$values];
-        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => $values];
+        $instance->conditionOrder[] = ['type' => 'and', 'sql' => $sql, 'bindings' => $values];
 
         return $instance;
     }
@@ -158,9 +164,11 @@ trait QueryConditions
 
         $instance = clone $this;
         $placeholders = implode(', ', array_fill(0, \count($values), $instance->getPlaceholder()));
-        $instance->whereNotIn[] = "{$column} NOT IN ({$placeholders})";
+        $sql = "{$column} NOT IN ({$placeholders})";
+
+        $instance->whereNotIn[] = $sql;
         $instance->bindings['whereNotIn'] = [...$instance->bindings['whereNotIn'], ...$values];
-        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => $values];
+        $instance->conditionOrder[] = ['type' => 'and', 'sql' => $sql, 'bindings' => $values];
 
         return $instance;
     }
@@ -184,10 +192,12 @@ trait QueryConditions
         $instance = clone $this;
         $placeholder1 = $instance->getPlaceholder();
         $placeholder2 = $instance->getPlaceholder();
-        $instance->whereBetween[] = "{$column} BETWEEN {$placeholder1} AND {$placeholder2}";
+        $sql = "{$column} BETWEEN {$placeholder1} AND {$placeholder2}";
+
+        $instance->whereBetween[] = $sql;
         $instance->bindings['whereBetween'][] = $values[0];
         $instance->bindings['whereBetween'][] = $values[1];
-        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => [$values[0], $values[1]]];
+        $instance->conditionOrder[] = ['type' => 'and', 'sql' => $sql, 'bindings' => [$values[0], $values[1]]];
 
         return $instance;
     }
@@ -202,8 +212,10 @@ trait QueryConditions
     public function whereNull(string $column): static
     {
         $instance = clone $this;
-        $instance->whereNull[] = "{$column} IS NULL";
-        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => []];
+        $sql = "{$column} IS NULL";
+
+        $instance->whereNull[] = $sql;
+        $instance->conditionOrder[] = ['type' => 'and', 'sql' => $sql, 'bindings' => []];
 
         return $instance;
     }
@@ -218,8 +230,10 @@ trait QueryConditions
     public function whereNotNull(string $column): static
     {
         $instance = clone $this;
-        $instance->whereNotNull[] = "{$column} IS NOT NULL";
-        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => []];
+        $sql = "{$column} IS NOT NULL";
+
+        $instance->whereNotNull[] = $sql;
+        $instance->conditionOrder[] = ['type' => 'and', 'sql' => $sql, 'bindings' => []];
 
         return $instance;
     }
@@ -237,7 +251,9 @@ trait QueryConditions
     {
         $instance = clone $this;
         $placeholder = $instance->getPlaceholder();
-        $instance->where[] = "{$column} LIKE {$placeholder}";
+        $sql = "{$column} LIKE {$placeholder}";
+
+        $instance->where[] = $sql;
 
         $likeValue = match ($side) {
             'before' => "%{$value}",
@@ -247,7 +263,7 @@ trait QueryConditions
         };
 
         $instance->bindings['where'][] = $likeValue;
-        $instance->conditionOrder[] = ['type' => 'and', 'bindings' => [$likeValue]];
+        $instance->conditionOrder[] = ['type' => 'and', 'sql' => $sql, 'bindings' => [$likeValue]];
 
         return $instance;
     }
@@ -325,11 +341,11 @@ trait QueryConditions
         if (strtoupper($operator) === 'OR') {
             $instance->orWhereRaw[] = $condition;
             $instance->bindings['orWhereRaw'] = [...$instance->bindings['orWhereRaw'], ...$bindings];
-            $instance->conditionOrder[] = ['type' => 'or', 'bindings' => $bindings];
+            $instance->conditionOrder[] = ['type' => 'or', 'sql' => $condition, 'bindings' => $bindings];
         } else {
             $instance->whereRaw[] = $condition;
             $instance->bindings['whereRaw'] = [...$instance->bindings['whereRaw'], ...$bindings];
-            $instance->conditionOrder[] = ['type' => 'and', 'bindings' => $bindings];
+            $instance->conditionOrder[] = ['type' => 'and', 'sql' => $condition, 'bindings' => $bindings];
         }
 
         return $instance;
@@ -374,10 +390,10 @@ trait QueryConditions
 
         if (strtoupper($boolean) === 'OR') {
             $instance->orWhere[] = $condition;
-            $instance->conditionOrder[] = ['type' => 'or', 'bindings' => []];
+            $instance->conditionOrder[] = ['type' => 'or', 'sql' => $condition, 'bindings' => []];
         } else {
             $instance->where[] = $condition;
-            $instance->conditionOrder[] = ['type' => 'and', 'bindings' => []];
+            $instance->conditionOrder[] = ['type' => 'and', 'sql' => $condition, 'bindings' => []];
         }
 
         return $instance;

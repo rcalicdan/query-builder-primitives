@@ -34,13 +34,27 @@ describe('SqlBuilder', function () {
         expect($sql)->toContain('HAVING COUNT(*) > ?');
     });
 
-    test('combines and and or conditions correctly', function () {
+    test('combines and and or conditions correctly in linear order', function () {
         $query = MockQueryBuilder::table('users')
             ->where('status', 'active')
             ->where('verified', true)
             ->orWhere('role', 'admin')
         ;
 
-        expect($query->toSql())->toContain('WHERE (status = ? AND verified = ?) OR role = ?');
+        // Note: No auto-parentheses. If the user wants parentheses, they use whereGroup()
+        expect($query->toSql())->toContain('WHERE status = ? AND verified = ? OR role = ?');
+    });
+
+    test('maintains strict chronological order of conditions and bindings', function () {
+        $query = MockQueryBuilder::table('users')
+            ->orWhere('role', 'admin')
+            ->where('status', 'active')
+        ;
+
+        $sql = $query->toSql();
+        $bindings = $query->getBindings();
+
+        expect($sql)->toContain('WHERE role = ? AND status = ?');
+        expect($bindings)->toBe(['admin', 'active']);
     });
 });

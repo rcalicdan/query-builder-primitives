@@ -18,6 +18,7 @@ namespace Rcalicdan\QueryBuilderPrimitives;
  * @property array<int, string> $whereNotNull
  * @property array<int, string> $whereRaw
  * @property array<int, string> $orWhereRaw
+ *
  * @method string buildSelectQuery()
  * @method array<mixed> getCompiledBindings()
  * @method string getDriver()

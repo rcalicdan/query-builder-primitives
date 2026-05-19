@@ -58,6 +58,21 @@ trait QueryBuilderCore
     }
 
     /**
+     * Set the table for the query (alias for table).
+     *
+     * @param string $table The table name.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function from(string $table): static
+    {
+        $instance = clone $this;
+        $instance->table = $table;
+
+        return $instance;
+    }
+
+    /**
      * Set the columns to select.
      *
      * @param string ...$columns The columns to select. Omit to select all columns (*).

@@ -378,57 +378,23 @@ trait SqlBuilder
      */
     protected function buildWhereClause(): string
     {
-        $allParts = $this->collectAllConditionParts();
-
-        if ($allParts === []) {
+        if ($this->conditionOrder === []) {
             return '';
         }
 
-        return $this->combineConditionParts($allParts);
-    }
+        $sql = '';
+        foreach ($this->conditionOrder as $index => $condition) {
+            $sqlString = $condition['sql'] ?? '';
 
-    /**
-     * Collect all condition parts from different sources.
-     *
-     * @return array<array{conditions: array<string>, operator: string, priority: int}> All condition parts.
-     */
-    protected function collectAllConditionParts(): array
-    {
-        $parts = [];
-
-        $andConditions = [...$this->where, ...$this->whereIn, ...$this->whereNotIn, ...$this->whereBetween, ...$this->whereNull, ...$this->whereNotNull, ...$this->whereRaw];
-
-        $filteredAnd = array_filter($andConditions, fn ($condition) => trim($condition) !== '');
-        if ($filteredAnd !== []) {
-            $parts[] = ['conditions' => $filteredAnd, 'operator' => 'AND', 'priority' => 1];
+            if ($index === 0) {
+                $sql .= $sqlString;
+            } else {
+                $operator = strtoupper($condition['type']);
+                $sql .= " {$operator} {$sqlString}";
+            }
         }
 
-        $orConditions = [...$this->orWhere, ...$this->orWhereRaw];
-        $filteredOr = array_filter($orConditions, fn ($condition) => trim($condition) !== '');
-        if ($filteredOr !== []) {
-            $parts[] = ['conditions' => $filteredOr, 'operator' => 'OR', 'priority' => 2];
-        }
-
-        return $parts;
-    }
-
-    /**
-     * Build a group of conditions with the same logical operator.
-     *
-     * @param array<string> $conditions Array of condition strings.
-     * @param string $operator The logical operator (AND/OR).
-     *
-     * @return string The built condition group.
-     */
-    protected function buildConditionGroup(array $conditions, string $operator): string
-    {
-        $filteredConditions = array_filter($conditions, fn ($condition) => trim($condition) !== '');
-
-        if ($filteredConditions === []) {
-            return '';
-        }
-
-        return implode(' ' . strtoupper($operator) . ' ', $filteredConditions);
+        return $sql;
     }
 
     /**
@@ -465,94 +431,5 @@ trait SqlBuilder
         }
 
         return $sql;
-    }
-
-    /**
-     * Combine different condition parts with appropriate logic.
-     *
-     * @param array<array{conditions: array<string>, operator: string, priority: int}> $parts Array of condition parts.
-     *
-     * @return string The combined condition string.
-     */
-    protected function combineConditionParts(array $parts): string
-    {
-        if ($parts === []) {
-            return '';
-        }
-
-        usort($parts, fn ($a, $b) => $a['priority'] <=> $b['priority']);
-
-        $andParts = [];
-        $orParts = [];
-
-        foreach ($parts as $part) {
-            if ($part['conditions'] === []) {
-                continue;
-            }
-
-            $conditionString = $this->buildConditionGroup($part['conditions'], $part['operator']);
-
-            if ($conditionString === '') {
-                continue;
-            }
-
-            if ($part['operator'] === 'AND') {
-                $andParts[] = $conditionString;
-            } else {
-                $orParts[] = $conditionString;
-            }
-        }
-
-        return $this->combineAndOrParts($andParts, $orParts);
-    }
-
-    /**
-     * Combine AND and OR parts with proper precedence.
-     *
-     * @param array<string> $andParts AND condition parts.
-     * @param array<string> $orParts OR condition parts.
-     *
-     * @return string The combined condition string.
-     */
-    protected function combineAndOrParts(array $andParts, array $orParts): string
-    {
-        if ($orParts === []) {
-            if ($andParts === []) {
-                return '';
-            }
-
-            return implode(' AND ', $andParts);
-        }
-
-        $finalParts = [];
-
-        if ($andParts !== []) {
-            $combinedAnd = implode(' AND ', $andParts);
-
-            if (\count($andParts) > 1 || str_contains($combinedAnd, ' AND ')) {
-                $finalParts[] = '(' . $combinedAnd . ')';
-            } else {
-                $finalParts[] = $combinedAnd;
-            }
-        }
-
-        foreach ($orParts as $orPart) {
-            $finalParts[] = $orPart;
-        }
-
-        return implode(' OR ', $finalParts);
-    }
-
-    /**
-     * Get all conditions organized by their logical operators.
-     *
-     * @return array<string, array<string>> Array of conditions grouped by operator type.
-     */
-    protected function getAllConditions(): array
-    {
-        return [
-            'AND' => [...$this->where, ...$this->whereIn, ...$this->whereNotIn, ...$this->whereBetween, ...$this->whereNull, ...$this->whereNotNull, ...$this->whereRaw],
-            'OR' => [...$this->orWhere, ...$this->orWhereRaw],
-        ];
     }
 }
