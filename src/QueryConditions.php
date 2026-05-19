@@ -52,7 +52,7 @@ trait QueryConditions
     protected array $orWhereRaw = [];
 
     /**
-     * @var array<string> The HAVING conditions for the query.
+     * @var array<int, array{type: string, sql: string}|string> The HAVING conditions for the query.
      */
     protected array $having = [];
 
@@ -274,10 +274,11 @@ trait QueryConditions
      * @param string $column The column name.
      * @param mixed $operator The comparison operator or value if only 2 arguments.
      * @param mixed $value The value to compare against.
+     * @param string $boolean The logical operator ('AND' or 'OR').
      *
      * @return static Returns a new query builder instance for method chaining.
      */
-    public function having(string $column, mixed $operator = null, mixed $value = null): static
+    public function having(string $column, mixed $operator = null, mixed $value = null, string $boolean = 'AND'): static
     {
         if (\func_num_args() === 2) {
             $value = $operator;
@@ -290,10 +291,32 @@ trait QueryConditions
 
         $instance = clone $this;
         $placeholder = $instance->getPlaceholder();
-        $instance->having[] = "{$column} {$operator} {$placeholder}";
+        $instance->having[] = [
+            'type' => strtoupper($boolean),
+            'sql' => "{$column} {$operator} {$placeholder}",
+        ];
         $instance->bindings['having'][] = $value;
 
         return $instance;
+    }
+
+    /**
+     * Add an OR HAVING clause to the query.
+     *
+     * @param string $column The column name.
+     * @param mixed $operator The comparison operator or value if only 2 arguments.
+     * @param mixed $value The value to compare against.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function orHaving(string $column, mixed $operator = null, mixed $value = null): static
+    {
+        if (\func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        return $this->having($column, $operator, $value, 'OR');
     }
 
     /**
@@ -301,22 +324,39 @@ trait QueryConditions
      *
      * @param string $condition The raw SQL condition.
      * @param array<mixed> $bindings Parameter bindings for the condition.
+     * @param string $boolean Logical operator ('AND' or 'OR').
      *
      * @return static Returns a new query builder instance for method chaining.
      *
      * @throws \InvalidArgumentException When named bindings are provided.
      */
-    public function havingRaw(string $condition, array $bindings = []): static
+    public function havingRaw(string $condition, array $bindings = [], string $boolean = 'AND'): static
     {
         if ($bindings !== [] && ! array_is_list($bindings)) {
             throw new \InvalidArgumentException('Query builder primitives only support positional bindings. Named bindings are not allowed.');
         }
 
         $instance = clone $this;
-        $instance->having[] = $condition;
+        $instance->having[] = [
+            'type' => $boolean,
+            'sql' => $condition,
+        ];
         $instance->bindings['having'] = [...$instance->bindings['having'], ...$bindings];
 
         return $instance;
+    }
+
+    /**
+     * Add a raw OR HAVING condition.
+     *
+     * @param string $condition The raw SQL condition.
+     * @param array<mixed> $bindings Parameter bindings for the condition.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function orHavingRaw(string $condition, array $bindings = []): static
+    {
+        return $this->havingRaw($condition, $bindings, 'OR');
     }
 
     /**

@@ -95,10 +95,11 @@ interface ConditionInterface
      * @param string $column The column name.
      * @param mixed $operator The comparison operator or value if only 2 arguments.
      * @param mixed $value The value to compare against.
+     * @param string $boolean The logical operator ('AND' or 'OR').
      *
      * @return static Returns a new query builder instance for method chaining.
      */
-    public function having(string $column, mixed $operator = null, mixed $value = null): static;
+    public function having(string $column, mixed $operator = null, mixed $value = null, string $boolean = 'AND'): static;
 
     /**
      * Add a raw HAVING condition.
@@ -111,6 +112,29 @@ interface ConditionInterface
      * @throws \InvalidArgumentException When named bindings are provided.
      */
     public function havingRaw(string $condition, array $bindings = []): static;
+
+    /**
+     * Add an OR HAVING clause to the query.
+     *
+     * @param string $column The column name.
+     * @param mixed $operator The comparison operator or value if only 2 arguments.
+     * @param mixed $value The value to compare against.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function orHaving(string $column, mixed $operator = null, mixed $value = null): static;
+
+    /**
+     * Add a raw OR HAVING condition.
+     *
+     * @param string $condition The raw SQL condition.
+     * @param array<mixed> $bindings Parameter bindings for the condition.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     *
+     * @throws \InvalidArgumentException When named bindings are provided.
+     */
+    public function orHavingRaw(string $condition, array $bindings = []): static;
 
     /**
      * Add a raw WHERE condition.

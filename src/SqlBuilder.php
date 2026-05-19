@@ -33,8 +33,9 @@ trait SqlBuilder
             $sql .= ' GROUP BY ' . implode(', ', $this->groupBy);
         }
 
-        if ($this->having !== []) {
-            $sql .= ' HAVING ' . implode(' AND ', $this->having);
+        $havingSql = $this->buildHavingClause();
+        if ($havingSql !== '') {
+            $sql .= ' HAVING ' . $havingSql;
         }
 
         if ($this->unions !== []) {
@@ -122,8 +123,9 @@ trait SqlBuilder
             $sql .= ' GROUP BY ' . implode(', ', $this->groupBy);
         }
 
-        if ($this->having !== []) {
-            $sql .= ' HAVING ' . implode(' AND ', $this->having);
+        $havingSql = $this->buildHavingClause();
+        if ($havingSql !== '') {
+            $sql .= ' HAVING ' . $havingSql;
         }
 
         return $sql;
@@ -398,6 +400,39 @@ trait SqlBuilder
     }
 
     /**
+     * Build the HAVING clause portion of the SQL query.
+     *
+     * @return string The HAVING clause string or empty string if no conditions.
+     */
+    protected function buildHavingClause(): string
+    {
+        if ($this->having === []) {
+            return '';
+        }
+
+        $sql = '';
+        foreach ($this->having as $index => $condition) {
+            $type = 'AND';
+            $sqlString = '';
+
+            if (\is_array($condition)) {
+                $type = strtoupper($condition['type']);
+                $sqlString = $condition['sql'];
+            } else {
+                $sqlString = $condition;
+            }
+
+            if ($index === 0) {
+                $sql .= $sqlString;
+            } else {
+                $sql .= " {$type} {$sqlString}";
+            }
+        }
+
+        return $sql;
+    }
+
+    /**
      * Build an aggregate query (MAX, MIN, AVG, SUM, COUNT).
      *
      * @param string $function The aggregate function name (MAX, MIN, AVG, SUM, COUNT).
@@ -426,8 +461,9 @@ trait SqlBuilder
             $sql .= ' GROUP BY ' . implode(', ', $this->groupBy);
         }
 
-        if ($this->having !== []) {
-            $sql .= ' HAVING ' . implode(' AND ', $this->having);
+        $havingSql = $this->buildHavingClause();
+        if ($havingSql !== '') {
+            $sql .= ' HAVING ' . $havingSql;
         }
 
         return $sql;

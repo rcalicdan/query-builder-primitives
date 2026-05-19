@@ -38,18 +38,20 @@ describe('QueryConditions Tests', function () {
         expect($query->getBindings())->toBe(['active', 'admin', 65]);
     });
 
-    test('having and havingRaw clauses generate correctly', function () {
+    test('having, orHaving, and havingRaw clauses generate correctly with correct logical operators', function () {
         $query = MockQueryBuilder::table('orders')
             ->select('user_id, SUM(total) as grand_total')
             ->groupBy('user_id')
             ->having('grand_total', '>', 1000)
+            ->orHaving('grand_total', '<', 50)
             ->havingRaw('COUNT(id) = ?', [5])
+            ->orHavingRaw('MAX(status) = ?', ['vip'])
         ;
 
         $sql = $query->toSql();
-        expect($sql)->toContain('HAVING grand_total > ? AND COUNT(id) = ?');
 
-        expect($query->getBindings())->toBe([1000, 5]);
+        expect($sql)->toContain('HAVING grand_total > ? OR grand_total < ? AND COUNT(id) = ? OR MAX(status) = ?');
+        expect($query->getBindings())->toBe([1000, 50, 5, 'vip']);
     });
 
     test('resetWhere clears all condition state and bindings', function () {
