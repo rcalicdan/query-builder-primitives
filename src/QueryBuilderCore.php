@@ -135,6 +135,9 @@ trait QueryBuilderCore
     /**
      * Set the database driver.
      *
+     * @internal This method is used internally for subquery driver propagation. 
+     *           Concrete implementations should manage driver configuration internally.
+     *
      * @param string $driver The driver name (mysql, pgsql, sqlite)
      *
      * @return static Returns a new query builder instance for method chaining.

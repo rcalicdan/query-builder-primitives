@@ -53,13 +53,4 @@ interface CoreInterface
      * @return static Returns a new query builder instance for method chaining.
      */
     public function selectDistinct(string ...$columns): static;
-
-    /**
-     * Set the database driver.
-     *
-     * @param string $driver The driver name (mysql, pgsql, sqlite)
-     *
-     * @return static Returns a new query builder instance for method chaining.
-     */
-    public function setDriver(string $driver): static;
 }
