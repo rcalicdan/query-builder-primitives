@@ -171,6 +171,34 @@ trait QueryBuilderCore
     }
 
     /**
+     * Get a new, clean instance of the query builder for subqueries.
+     *
+     * Developers with custom constructors (e.g., passing PDO or connections)
+     * MUST override this method in their concrete class to pass those dependencies.
+     *
+     * @return static Returns a new query builder instance.
+     *
+     * @throws \LogicException When the class has required constructor parameters but this method wasn't overridden.
+     */
+    protected function newQuery(): static
+    {
+        try {
+            return new static();
+        } catch (\ArgumentCountError $e) {
+            throw new \LogicException(
+                sprintf(
+                    'Cannot instantiate subquery builder for class "%s". ' .
+                    'Because your constructor requires arguments, you must override the ' .
+                    'protected `newQuery(): static` method in your class to manually pass your dependencies.',
+                    static::class
+                ),
+                0,
+                $e
+            );
+        }
+    }
+
+    /**
      * Compiles the final bindings array in the correct order for execution.
      *
      * @return array<mixed>

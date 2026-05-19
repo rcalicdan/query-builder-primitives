@@ -21,7 +21,7 @@ trait QueryUnion
      */
     public function union(callable $callback, bool $all = false): static
     {
-        $subBuilder = new static();
+        $subBuilder = $this->newQuery();
 
         if (\is_callable([$this, 'getDriver']) && \is_callable([$subBuilder, 'setDriver'])) {
             $driver = $this->getDriver();

@@ -16,7 +16,12 @@ trait QueryAdvancedConditions
      */
     public function whereGroup(callable $callback, string $logicalOperator = 'AND'): static
     {
-        $subBuilder = new static($this->table);
+        $subBuilder = $this->newQuery();
+        
+        if ($this->table !== '') {
+            $subBuilder = $subBuilder->from($this->table);
+        }
+
         $subBuilder = $subBuilder->setDriver($this->getDriver());
         $subBuilder = $callback($subBuilder);
 
@@ -64,7 +69,7 @@ trait QueryAdvancedConditions
      */
     public function whereExists(callable $callback, string $operator = 'AND'): static
     {
-        $subBuilder = new static();
+        $subBuilder = $this->newQuery();
         $subBuilder = $subBuilder->setDriver($this->getDriver());
         $subBuilder = $callback($subBuilder);
 
@@ -88,7 +93,7 @@ trait QueryAdvancedConditions
      */
     public function whereNotExists(callable $callback, string $operator = 'AND'): static
     {
-        $subBuilder = new static();
+        $subBuilder = $this->newQuery();
         $subBuilder = $subBuilder->setDriver($this->getDriver());
         $subBuilder = $callback($subBuilder);
 
@@ -137,7 +142,7 @@ trait QueryAdvancedConditions
      */
     public function whereSub(string $column, string $operator, callable $callback): static
     {
-        $subBuilder = new static();
+        $subBuilder = $this->newQuery();
         $subBuilder = $subBuilder->setDriver($this->getDriver());
         $subBuilder = $callback($subBuilder);
 
