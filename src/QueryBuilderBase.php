@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Rcalicdan\QueryBuilderPrimitives;
 
+use Rcalicdan\QueryBuilderPrimitives\Interfaces\QueryBuilderInterface;
+
 /**
  * @phpstan-consistent-constructor
  */
-class QueryBuilderBase
+class QueryBuilderBase implements QueryBuilderInterface
 {
     use QueryAdvancedConditions;
     use QueryBuilderCore;
