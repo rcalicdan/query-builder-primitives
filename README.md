@@ -41,7 +41,7 @@ QueryDebug (depends on: all traits)
 
 | Trait | Purpose | Dependencies |
 | :--- | :--- | :--- |
-| `QueryBuilderCore` | Core properties and table/select methods | None (foundation) |
+| `QueryBuilderCore` | Core properties, select, and `from()` | None (foundation) |
 | `SqlBuilder` | Builds SQL query strings | QueryBuilderCore + condition/join/grouping traits |
 | `QueryConditions` | Basic WHERE, HAVING, LIKE clauses | QueryBuilderCore |
 | `QueryAdvancedConditions` | Nested conditions, EXISTS, subqueries | QueryConditions, SqlBuilder |
@@ -50,6 +50,24 @@ QueryDebug (depends on: all traits)
 | `QueryLocking` | Pessimistic locking (FOR UPDATE, FOR SHARE, NOWAIT, SKIP LOCKED) | QueryBuilderCore, SqlBuilder |
 | `QueryUnion` | UNION and UNION ALL operations | QueryBuilderCore, SqlBuilder |
 | `QueryDebug` | Debug utilities (toSql, dump, dd) | All traits |
+
+### Interfaces
+
+Each trait has a corresponding contract under `Rcalicdan\QueryBuilderPrimitives\Interfaces\`:
+
+| Interface | Covers |
+| :--- | :--- |
+| `CoreInterface` | `from`, `select`, `addSelect`, `selectRaw`, `selectDistinct` |
+| `ConditionInterface` | All WHERE, HAVING, LIKE methods |
+| `AdvancedConditionInterface` | `whereGroup`, `whereExists`, `whereSub`, etc. |
+| `JoinInterface` | All JOIN methods |
+| `GroupingInterface` | `groupBy`, `orderBy`, `limit`, `offset`, `forPage` |
+| `LockingInterface` | All locking methods |
+| `UnionInterface` | `union`, `unionAll` |
+| `DebugInterface` | `toSql`, `getBindings`, `toRawSql`, `dump`, `dd` |
+| `QueryBuilderPrimitiveInterface` | Extends all of the above |
+
+`QueryBuilderBase` implements `QueryBuilderPrimitiveInterface` and uses all traits, making it a ready-made full implementation you can extend.
 
 ## Quick Start
 
@@ -71,13 +89,6 @@ class QueryBuilder
     use QueryBuilderCore;
     use SqlBuilder;
     use QueryConditions;
-    
-    public function __construct(?string $table = null)
-    {
-        if ($table !== null) {
-            $this->table = $table;
-        }
-    }
 }
 
 // Usage
@@ -102,37 +113,11 @@ $bindings = $qb->getBindings();
 
 namespace App\Database;
 
-use Rcalicdan\QueryBuilderPrimitives\{
-    QueryBuilderCore,
-    QueryConditions,
-    QueryAdvancedConditions,
-    QueryJoin,
-    QueryGrouping,
-    QueryLocking,
-    QueryUnion,
-    QueryDebug,
-    SqlBuilder
-};
+use Rcalicdan\QueryBuilderPrimitives\QueryBuilderBase;
 
-class FullQueryBuilder
-{
-    use QueryBuilderCore;
-    use SqlBuilder;
-    use QueryConditions;
-    use QueryAdvancedConditions;
-    use QueryJoin;
-    use QueryGrouping;
-    use QueryLocking;
-    use QueryUnion;
-    use QueryDebug;
-    
-    public function __construct(?string $table = null)
-    {
-        if ($table !== null) {
-            $this->table = $table;
-        }
-    }
-}
+// QueryBuilderBase already composes every trait and implements QueryBuilderPrimitiveInterface.
+// Extend it directly, or compose your own from individual traits.
+class FullQueryBuilder extends QueryBuilderBase {}
 
 // Usage with advanced features
 $qb = new FullQueryBuilder();
@@ -154,22 +139,29 @@ $qb->from('users')
 
 ### QueryBuilderCore
 
-Foundation trait providing core functionality.
+Foundation trait providing core properties and select/driver management.
 
 **Properties:**
 *   `$table` - Table name
 *   `$select` - Select columns
 *   `$bindings` - Parameter bindings array
 
-**Methods:**
+**Public Methods:**
 ```php
-table(string $table): static
-from(string $table): static             // alias for table()
+from(string $table): static
 select(string ...$columns): static
 addSelect(string ...$columns): static
 selectRaw(string $expression, array $bindings = []): static
 selectDistinct(string ...$columns): static
 setDriver(string $driver): static       // 'mysql' | 'pgsql' | 'sqlite'
+```
+
+**Protected Methods:**
+```php
+newQuery(): static          // Returns a fresh instance for subqueries/unions — override this when your constructor takes arguments
+getDriver(): string
+getPlaceholder(): string
+getCompiledBindings(): array
 ```
 
 **Examples:**
@@ -189,12 +181,48 @@ $qb->from('orders')
     ->selectRaw('SUM(total) as total_spent')
     ->selectRaw('COUNT(*) as order_count');
 
-// Select with raw bindings
+// Parameterised raw expression
 $qb->from('products')
     ->selectRaw('CASE WHEN price > ? THEN ? ELSE ? END as tier', [100, 'premium', 'standard']);
 
 // DISTINCT
 $qb->from('users')->selectDistinct('country');
+```
+
+#### The `newQuery()` Method — Required Override for Custom Constructors
+
+`newQuery()` is the internal factory used by `QueryAdvancedConditions` and `QueryUnion` whenever they need a fresh builder instance for subqueries or unions. The default implementation calls `new static()` with no arguments.
+
+**If your concrete class has required constructor parameters** (e.g., a PDO connection, a service container, or a config object), you **must** override `newQuery()` to pass those dependencies. Without this, subquery methods (`whereExists`, `whereGroup`, `whereSub`, `union`, etc.) will throw a `\LogicException` at runtime.
+
+```php
+class ExecutableQueryBuilder extends QueryBuilderBase
+{
+    public function __construct(private PDO $pdo) {}
+
+    // REQUIRED: pass the PDO dependency to the fresh instance
+    protected function newQuery(): static
+    {
+        return new static($this->pdo);
+    }
+
+    public function get(): array
+    {
+        $stmt = $this->pdo->prepare($this->buildSelectQuery());
+        $stmt->execute($this->getCompiledBindings());
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // ... other execution methods
+}
+```
+
+If you forget to override `newQuery()` and call a subquery method, you will get:
+
+```
+LogicException: Cannot instantiate subquery builder for class "App\Database\ExecutableQueryBuilder".
+Because your constructor requires arguments, you must override the protected `newQuery(): static`
+method in your class to manually pass your dependencies.
 ```
 
 ---
@@ -215,8 +243,10 @@ whereNotNull(string $column): static
 whereColumn(string $first, ?string $operator, ?string $second, string $boolean = 'AND'): static
 orWhereColumn(string $first, ?string $operator, ?string $second): static
 like(string $column, string $value, string $side = 'both'): static
-having(string $column, mixed $operator, mixed $value): static
-havingRaw(string $condition, array $bindings = []): static
+having(string $column, mixed $operator, mixed $value, string $boolean = 'AND'): static
+orHaving(string $column, mixed $operator, mixed $value): static
+havingRaw(string $condition, array $bindings = [], string $boolean = 'AND'): static
+orHavingRaw(string $condition, array $bindings = []): static
 whereRaw(string $condition, array $bindings = [], string $operator = 'AND'): static
 orWhereRaw(string $condition, array $bindings = []): static
 resetWhere(): static
@@ -231,8 +261,9 @@ $qb->where('status', 'active')
 // Two-argument shorthand (defaults to '=')
 $qb->where('status', 'active');
 
-// WHERE IN
-$qb->whereIn('id', [1, 2, 3, 4, 5]);
+// WHERE IN / NOT IN
+$qb->whereIn('id', [1, 2, 3]);
+$qb->whereNotIn('role', ['guest', 'banned']);
 
 // WHERE BETWEEN
 $qb->whereBetween('age', [18, 65]);
@@ -242,9 +273,9 @@ $qb->whereNull('deleted_at')
    ->whereNotNull('email');
 
 // Column-to-column comparison (no binding, no injection risk)
-$qb->whereColumn('created_at', 'updated_at');           // created_at = updated_at
-$qb->whereColumn('price', '>', 'discounted_price');     // price > discounted_price
-$qb->orWhereColumn('verified_at', 'created_at');        // OR verified_at = created_at
+$qb->whereColumn('created_at', 'updated_at');          // created_at = updated_at
+$qb->whereColumn('price', '>', 'discounted_price');
+$qb->orWhereColumn('verified_at', 'created_at');
 
 // LIKE clauses
 $qb->like('name', 'John', 'both');          // %John%
@@ -259,9 +290,24 @@ $qb->whereRaw('age > ? AND status = ?', [18, 'active']);
 $qb->where('status', 'active')
    ->orWhere('status', 'pending');
 
-// HAVING
+// HAVING — AND (default)
+$qb->from('orders')
+   ->select('user_id')
+   ->selectRaw('COUNT(*) as total')
+   ->groupBy('user_id')
+   ->having('total', '>', 5);
+
+// HAVING — OR
 $qb->groupBy('user_id')
-   ->having('COUNT(*)', '>', 5);
+   ->having('total_orders', '>', 10)
+   ->orHaving('total_spent', '>', 1000);
+// HAVING total_orders > ? OR total_spent > ?
+
+// Raw HAVING
+$qb->groupBy('department')
+   ->havingRaw('SUM(salary) > ?', [50000])
+   ->orHavingRaw('COUNT(*) > ?', [20]);
+// HAVING SUM(salary) > ? OR COUNT(*) > ?
 ```
 
 ---
@@ -271,6 +317,8 @@ $qb->groupBy('user_id')
 Advanced nested conditions and subqueries.
 
 **Dependencies:** Requires `QueryConditions` and `SqlBuilder`
+
+> **Note:** These methods use `newQuery()` internally. If your builder has constructor arguments, override `newQuery()` — see the `QueryBuilderCore` section above.
 
 **Methods:**
 ```php
@@ -408,15 +456,13 @@ $qb->orderByDesc('created_at')
     ->orderByAsc('name');
 
 // LIMIT and OFFSET
-$qb->limit(10)
-    ->offset(20);
+$qb->limit(10)->offset(20);
 
 // Or combined
 $qb->limit(10, 20); // LIMIT 10 OFFSET 20
 
 // Pagination helper
-$qb->forPage(2, 25); // Page 2, 25 per page
-// Equivalent to: limit(25, 25)
+$qb->forPage(2, 25); // Page 2, 25 per page = LIMIT 25 OFFSET 25
 ```
 
 ---
@@ -435,7 +481,7 @@ lockForUpdate(): static
 lockForShare(): static
 noWait(): static
 skipLocked(): static
-lockOf(string|array $tables): static   // PostgreSQL only
+lockOf(string|array $tables): static    // PostgreSQL only
 withoutLock(): static
 ```
 
@@ -455,22 +501,22 @@ withoutLock(): static
 
 **Examples:**
 ```php
-// Exclusive lock — no other transaction can read or modify these rows
+// Exclusive lock
 $qb->from('orders')
     ->where('id', 1)
     ->lockForUpdate()
     ->toSql();
 // MySQL/PgSQL: SELECT * FROM orders WHERE id = ? FOR UPDATE
 
-// Shared lock — other transactions can read but not modify
+// Shared lock
 $qb->from('inventory')
     ->where('product_id', 42)
     ->lockForShare()
     ->toSql();
-// MySQL:  SELECT * FROM inventory WHERE product_id = ? LOCK IN SHARE MODE
-// PgSQL:  SELECT * FROM inventory WHERE product_id = ? FOR SHARE
+// MySQL: SELECT * FROM inventory WHERE product_id = ? LOCK IN SHARE MODE
+// PgSQL: SELECT * FROM inventory WHERE product_id = ? FOR SHARE
 
-// Fail immediately if rows are already locked (MySQL 8+ / PostgreSQL)
+// Fail immediately if rows are locked
 $qb->from('orders')
     ->where('status', 'pending')
     ->lockForUpdate()
@@ -488,7 +534,7 @@ $qb->from('jobs')
     ->toSql();
 // SELECT * FROM jobs WHERE status = ? ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED
 
-// PostgreSQL: lock only the orders table when joining (OF clause)
+// PostgreSQL OF clause
 $qb->from('orders')
     ->setDriver('pgsql')
     ->join('users', 'orders.user_id = users.id')
@@ -497,24 +543,12 @@ $qb->from('orders')
     ->toSql();
 // SELECT * FROM orders INNER JOIN users ON orders.user_id = users.id FOR UPDATE OF orders
 
-// PostgreSQL: OF with multiple tables
-$qb->from('orders')
-    ->setDriver('pgsql')
-    ->join('items', 'orders.id = items.order_id')
-    ->lockForUpdate()
-    ->lockOf(['orders', 'items'])
-    ->noWait()
-    ->toSql();
-// SELECT * FROM orders INNER JOIN items ON orders.id = items.order_id FOR UPDATE OF orders, items NOWAIT
-
-// Remove a lock from a reused base query
-$base = $qb->from('orders')->lockForUpdate();
+// Remove lock from a reused base query
+$base   = $qb->from('orders')->lockForUpdate();
 $unlocked = $base->withoutLock();
 ```
 
 #### Clause ordering
-
-The lock clause is always appended last, after `LIMIT` / `OFFSET`:
 
 ```
 SELECT ... FROM ... JOIN ... WHERE ... GROUP BY ... HAVING ... ORDER BY ... LIMIT ... OFFSET ... <LOCK>
@@ -527,6 +561,8 @@ SELECT ... FROM ... JOIN ... WHERE ... GROUP BY ... HAVING ... ORDER BY ... LIMI
 UNION and UNION ALL operations.
 
 **Dependencies:** Requires `QueryBuilderCore` and `SqlBuilder`
+
+> **Note:** This trait uses `newQuery()` internally. If your builder has constructor arguments, override `newQuery()` — see the `QueryBuilderCore` section above.
 
 **Methods:**
 ```php
@@ -548,7 +584,7 @@ $qb->from('active_users')
 // SELECT id, name, email FROM active_users
 // UNION SELECT id, name, email FROM archived_users
 
-// UNION ALL (keeps duplicate rows)
+// UNION ALL (keeps duplicates)
 $qb->from('orders_2023')
     ->select('id', 'total', 'created_at')
     ->unionAll(function($query) {
@@ -567,43 +603,32 @@ $qb->from('employees')
     ->select('id', 'name', 'department')
     ->where('active', true)
     ->union(function($query) {
-        return $query
-            ->from('contractors')
-            ->select('id', 'name', 'department')
-            ->where('active', true);
+        return $query->from('contractors')
+                     ->select('id', 'name', 'department')
+                     ->where('active', true);
     })
     ->union(function($query) {
-        return $query
-            ->from('interns')
-            ->select('id', 'name', 'department');
+        return $query->from('interns')
+                     ->select('id', 'name', 'department');
     })
-    ->orderBy('name')
-    ->toSql();
-// SELECT id, name, department FROM employees WHERE active = ?
-// UNION SELECT id, name, department FROM contractors WHERE active = ?
-// UNION SELECT id, name, department FROM interns
-// ORDER BY name ASC
+    ->orderBy('name');
 
-// UNION with conditions and bindings
+// Bindings are correctly propagated across all union branches
 $qb->from('products')
     ->select('id', 'name', 'price')
     ->where('category', 'electronics')
     ->unionAll(function($query) {
-        return $query
-            ->from('products')
-            ->select('id', 'name', 'price')
-            ->where('category', 'accessories')
-            ->where('price', '<', 50);
-    })
-    ->toSql();
-// SELECT id, name, price FROM products WHERE category = ?
-// UNION ALL SELECT id, name, price FROM products WHERE category = ? AND price < ?
+        return $query->from('products')
+                     ->select('id', 'name', 'price')
+                     ->where('category', 'accessories')
+                     ->where('price', '<', 50);
+    });
 
 $bindings = $qb->getBindings();
 // ['electronics', 'accessories', 50]
 ```
 
-> **Note:** `ORDER BY`, `LIMIT`, and `OFFSET` placed on the outer query apply to the full union result set. Column counts and types must match across all unioned queries.
+> `ORDER BY`, `LIMIT`, and `OFFSET` placed on the outer query apply to the full union result set. Column counts and types must match across all unioned queries.
 
 ---
 
@@ -641,7 +666,7 @@ echo $rawSql; // SELECT * FROM users WHERE status = 'active'
 // Dump and continue
 $qb->from('users')
     ->where('status', 'active')
-    ->dump() // Prints debug info
+    ->dump()
     ->where('age', '>=', 18)
     ->dump();
 
@@ -649,12 +674,6 @@ $qb->from('users')
 $qb->from('users')
     ->where('status', 'active')
     ->dd();
-
-// Debug output includes:
-// - Formatted SQL with syntax highlighting
-// - Bindings with types
-// - Raw SQL with values interpolated
-// - Query statistics (table, binding count, joins, conditions, etc.)
 ```
 
 ---
@@ -665,7 +684,7 @@ Builds SQL query strings from accumulated state.
 
 **Dependencies:** Requires `QueryBuilderCore` and properties from condition/join/grouping traits
 
-**Protected Methods** (used internally):
+**Protected Methods** (used internally or for extension):
 ```php
 buildSelectQuery(): string
 buildCountQuery(string $column = '*'): string
@@ -674,36 +693,34 @@ buildInsertBatchQuery(array $data): string
 buildUpdateQuery(array $data): string
 buildDeleteQuery(): string
 buildWhereClause(): string
+buildHavingClause(): string
 buildAggregateQuery(string $function, string $column): string
 buildUpsertQuery(array $data, string|array $uniqueColumns, ?array $updateColumns = null): string
 ```
 
-> **Note:** These are protected methods intended for internal use or for extending the query builder with execution methods.
+> `buildHavingClause()` handles both `AND` and `OR` conditions, driven by the `$boolean` parameter on `having()` and `havingRaw()`.
 
 ## Immutability
 
 All methods return a **new instance** of the query builder, ensuring immutability:
 
 ```php
-$baseQuery = $qb->from('users')->where('status', 'active');
+$base = $qb->from('users')->where('status', 'active');
 
-$query1 = $baseQuery->where('age', '>=', 18);
-$query2 = $baseQuery->where('country', 'US');
+$query1 = $base->where('age', '>=', 18);
+$query2 = $base->where('country', 'US');
 
-// $baseQuery remains unchanged
-// $query1 and $query2 are different queries
+// $base remains unchanged; $query1 and $query2 are independent
 
 // Same applies to locks and unions
-$base   = $qb->from('orders')->where('status', 'pending');
-$locked = $base->lockForUpdate();
-$union  = $base->union(fn($q) => $q->from('archived_orders'));
+$plain  = $qb->from('orders')->where('status', 'pending');
+$locked = $plain->lockForUpdate();
+$union  = $plain->union(fn($q) => $q->from('archived_orders'));
 
-// $base has no lock and no union; $locked and $union are independent forks
+// $plain has no lock and no union; $locked and $union are independent forks
 ```
 
 ## Extending with Execution
-
-Since this is a primitive library, execution is not included. Here's how you'd add it:
 
 ```php
 <?php
@@ -711,88 +728,82 @@ Since this is a primitive library, execution is not included. Here's how you'd a
 namespace App\Database;
 
 use PDO;
+use Rcalicdan\QueryBuilderPrimitives\QueryBuilderBase;
 
-class ExecutableQueryBuilder extends FullQueryBuilder
+class ExecutableQueryBuilder extends QueryBuilderBase
 {
-    public function __construct(
-        private PDO $pdo,
-        ?string $table = null
-    ) {
-        parent::__construct($table);
+    public function __construct(private PDO $pdo) {}
+
+    /**
+     * REQUIRED when your constructor takes arguments.
+     * Called internally by whereExists(), whereGroup(), union(), etc.
+     */
+    protected function newQuery(): static
+    {
+        return new static($this->pdo);
     }
-    
+
     public function get(): array
     {
-        $sql = $this->buildSelectQuery();
-        $bindings = $this->getCompiledBindings();
-        
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($bindings);
-        
+        $stmt = $this->pdo->prepare($this->buildSelectQuery());
+        $stmt->execute($this->getCompiledBindings());
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
-    
+
     public function first(): ?array
     {
-        $result = $this->limit(1)->get();
-        return $result[0] ?? null;
+        return $this->limit(1)->get()[0] ?? null;
     }
-    
+
     public function count(string $column = '*'): int
     {
-        $sql = $this->buildCountQuery($column);
-        $bindings = $this->getCompiledBindings();
-        
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($bindings);
-        
+        $stmt = $this->pdo->prepare($this->buildCountQuery($column));
+        $stmt->execute($this->getCompiledBindings());
         return (int) $stmt->fetchColumn();
     }
-    
+
     public function insert(array $data): bool
     {
-        $sql = $this->buildInsertQuery($data);
-        $stmt = $this->pdo->prepare($sql);
-        
+        $stmt = $this->pdo->prepare($this->buildInsertQuery($data));
         return $stmt->execute(array_values($data));
     }
-    
+
     public function update(array $data): int
     {
-        $sql = $this->buildUpdateQuery($data);
-        $bindings = array_merge(array_values($data), $this->getCompiledBindings());
-        
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($bindings);
-        
+        $stmt = $this->pdo->prepare($this->buildUpdateQuery($data));
+        $stmt->execute(array_merge(array_values($data), $this->getCompiledBindings()));
         return $stmt->rowCount();
     }
-    
+
     public function delete(): int
     {
-        $sql = $this->buildDeleteQuery();
-        $bindings = $this->getCompiledBindings();
-        
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($bindings);
-        
+        $stmt = $this->pdo->prepare($this->buildDeleteQuery());
+        $stmt->execute($this->getCompiledBindings());
         return $stmt->rowCount();
     }
 }
 
 // Usage
 $pdo = new PDO('mysql:host=localhost;dbname=mydb', 'user', 'pass');
-$qb = new ExecutableQueryBuilder($pdo);
+$qb  = new ExecutableQueryBuilder($pdo);
 
 $users = $qb->from('users')
     ->where('status', 'active')
-    ->orderBy('created_at', 'DESC')
+    ->orderByDesc('created_at')
     ->limit(10)
     ->get();
 
-// With locking inside a transaction
-$pdo->beginTransaction();
+// EXISTS subquery — works because newQuery() is overridden
+$highValue = $qb->from('users')
+    ->whereExists(function($q) {
+        return $q->from('orders')
+                 ->whereRaw('orders.user_id = users.id')
+                 ->where('total', '>', 1000);
+    })
+    ->get();
 
+// Locking inside a transaction
+$pdo->beginTransaction();
 $job = $qb->from('jobs')
     ->where('status', 'pending')
     ->orderBy('created_at')
@@ -800,9 +811,7 @@ $job = $qb->from('jobs')
     ->lockForUpdate()
     ->skipLocked()
     ->first();
-
 // process $job ...
-
 $pdo->commit();
 ```
 
@@ -850,20 +859,20 @@ class ReportingQueryBuilder
 }
 ```
 
-### 4. Complex Query Builder (All Features)
+### 4. Full-Featured (All Traits)
 
 ```php
-class ComplexQueryBuilder
+// Use QueryBuilderBase directly — it already composes everything.
+use Rcalicdan\QueryBuilderPrimitives\QueryBuilderBase;
+
+class MyQueryBuilder extends QueryBuilderBase
 {
-    use QueryBuilderCore;
-    use SqlBuilder;
-    use QueryConditions;
-    use QueryAdvancedConditions;
-    use QueryJoin;
-    use QueryGrouping;
-    use QueryLocking;
-    use QueryUnion;
-    use QueryDebug;
+    public function __construct(private PDO $pdo) {}
+
+    protected function newQuery(): static
+    {
+        return new static($this->pdo);
+    }
 }
 ```
 
@@ -884,33 +893,24 @@ $qb->from('users')
     });
 ```
 
-### Column Comparison Patterns
+### OR HAVING
 
 ```php
-// Rows where updated_at is more recent than created_at
-$qb->from('users')
-    ->whereColumn('updated_at', '>', 'created_at');
-
-// Rows where a value matches its mirror column
-$qb->from('audit_log')
-    ->whereColumn('expected_hash', 'actual_hash')   // two-arg shorthand, defaults to =
-    ->orWhereColumn('verified_at', 'created_at');
-```
-
-### selectRaw Patterns
-
-```php
-// Conditional expression
+// Reports where activity is high by either metric
 $qb->from('orders')
-    ->select('id', 'user_id')
-    ->selectRaw('SUM(total) as total_spent')
+    ->select('user_id')
     ->selectRaw('COUNT(*) as order_count')
-    ->selectRaw('MAX(total) as largest_order')
-    ->groupBy('user_id');
+    ->selectRaw('SUM(total) as total_spent')
+    ->groupBy('user_id')
+    ->having('order_count', '>', 10)
+    ->orHaving('total_spent', '>', 5000);
+// HAVING order_count > ? OR total_spent > ?
 
-// Parameterised raw expression
-$qb->from('products')
-    ->selectRaw('CASE WHEN stock > ? THEN ? ELSE ? END as availability', [0, 'in_stock', 'out_of_stock']);
+// Mix of raw and structured conditions
+$qb->from('stats')
+    ->groupBy('team_id')
+    ->havingRaw('SUM(points) > ?', [100])
+    ->orHavingRaw('COUNT(wins) >= ?', [20]);
 ```
 
 ### Subquery Patterns
@@ -924,69 +924,48 @@ $qb->from('users')
                  ->where('total', '>', 1000);
     });
 
-// Users with more orders than average
-$qb->from('users')
-    ->whereSub('total_orders', '>', function($q) {
-        return $q->from('orders')
-                 ->selectRaw('AVG(order_count)')
-                 ->from('(SELECT user_id, COUNT(*) as order_count FROM orders GROUP BY user_id) as subquery');
-    });
+// Column-to-column comparison
+$qb->from('audit_log')
+    ->whereColumn('expected_hash', 'actual_hash')
+    ->orWhereColumn('verified_at', '>', 'created_at');
 ```
 
 ### Pessimistic Locking Patterns
 
 ```php
-// Payment processing — hold rows exclusively while charging
+// Payment processing
 $pdo->beginTransaction();
-
 $order = $qb->from('orders')
     ->where('id', $orderId)
     ->where('status', 'pending')
     ->lockForUpdate()
     ->first();
-
-if ($order) {
-    // safe to charge — no other process can touch this row
-}
-
 $pdo->commit();
 
-// Job queue — multiple workers each claim one job without colliding
+// Job queue with SKIP LOCKED
 $pdo->beginTransaction();
-
 $job = $qb->from('jobs')
     ->where('status', 'available')
-    ->orderBy('priority', 'DESC')
+    ->orderByDesc('priority')
     ->orderBy('created_at')
     ->limit(1)
     ->lockForUpdate()
-    ->skipLocked()   // other workers skip this row instead of waiting
+    ->skipLocked()
     ->first();
-
-$pdo->commit();
-
-// Inventory check — read-consistent snapshot while others can still read
-$pdo->beginTransaction();
-
-$stock = $qb->from('inventory')
-    ->where('product_id', $productId)
-    ->lockForShare()
-    ->first();
-
 $pdo->commit();
 ```
 
 ### UNION Patterns
 
 ```php
-// Combine results from partitioned tables
+// Combine partitioned tables
 $qb->from('logs_2024')
     ->select('id', 'user_id', 'action', 'created_at')
     ->unionAll(function($q) {
         return $q->from('logs_2025')
                  ->select('id', 'user_id', 'action', 'created_at');
     })
-    ->orderBy('created_at', 'DESC')
+    ->orderByDesc('created_at')
     ->limit(100);
 
 // Merge different record types into a single feed
@@ -998,7 +977,7 @@ $qb->from('posts')
                  ->select('id', 'body as title', 'created_at')
                  ->selectRaw("'comment' as type");
     })
-    ->orderBy('created_at', 'DESC');
+    ->orderByDesc('created_at');
 ```
 
 ### Reporting Queries
@@ -1014,6 +993,7 @@ $qb->from('orders')
     ->whereBetween('orders.created_at', ['2024-01-01', '2024-12-31'])
     ->groupBy('users.id')
     ->having('total_orders', '>', 5)
+    ->orHaving('total_spent', '>', 10000)
     ->orderByDesc('total_spent')
     ->limit(100);
 ```
