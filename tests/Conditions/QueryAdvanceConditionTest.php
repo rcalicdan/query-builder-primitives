@@ -53,7 +53,7 @@ describe('QueryAdvancedConditions', function () {
         $query = MockQueryBuilder::table('users')
             ->whereExists(function ($query) {
                 return $query
-                    ->table('orders')
+                    ->from('orders')
                     ->where('user_id', 'users.id')
                 ;
             })
@@ -75,7 +75,7 @@ describe('QueryAdvancedConditions', function () {
         $query = MockQueryBuilder::table('users')
             ->whereNotExists(function ($query) {
                 return $query
-                    ->table('bans')
+                    ->from('bans')
                     ->where('user_id', 'users.id')
                 ;
             })
@@ -89,7 +89,7 @@ describe('QueryAdvancedConditions', function () {
             ->where('status', 'active')
             ->orWhereExists(function ($query) {
                 return $query
-                    ->table('premium_memberships')
+                    ->from('premium_memberships')
                     ->where('user_id', 'users.id')
                 ;
             })
@@ -103,7 +103,7 @@ describe('QueryAdvancedConditions', function () {
             ->where('status', 'active')
             ->orWhereNotExists(function ($query) {
                 return $query
-                    ->table('suspensions')
+                    ->from('suspensions')
                     ->where('user_id', 'users.id')
                 ;
             })
@@ -116,7 +116,7 @@ describe('QueryAdvancedConditions', function () {
         $query = MockQueryBuilder::table('users')
             ->whereSub('user_count', '>', function ($query) {
                 return $query
-                    ->table('orders')
+                    ->from('orders')
                     ->select('COUNT(*)')
                 ;
             })

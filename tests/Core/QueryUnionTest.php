@@ -10,7 +10,7 @@ describe('QueryUnion', function () {
             ->select('id', 'name')
             ->where('status', 'active')
             ->union(function ($q) {
-                return $q->table('archived_users')
+                return $q->from('archived_users')
                          ->select('id', 'name')
                          ->where('status', 'banned')
                 ;
@@ -27,7 +27,7 @@ describe('QueryUnion', function () {
         $query = MockQueryBuilder::table('users')
             ->where('role', 'admin')
             ->unionAll(function ($q) {
-                return $q->table('users')->where('role', 'moderator');
+                return $q->from('users')->where('role', 'moderator');
             })
         ;
 
@@ -38,8 +38,8 @@ describe('QueryUnion', function () {
     test('handles multiple unions', function () {
         $query = MockQueryBuilder::table('users')
             ->where('status', 'active')
-            ->union(fn ($q) => $q->table('admins')->where('level', 1))
-            ->unionAll(fn ($q) => $q->table('guests')->where('active', 1))
+            ->union(fn ($q) => $q->from('admins')->where('level', 1))
+            ->unionAll(fn ($q) => $q->from('guests')->where('active', 1))
         ;
 
         $sql = $query->toSql();
@@ -53,7 +53,7 @@ describe('QueryUnion', function () {
             ->select('id', 'created_at')
             ->where('status', 'active')
             ->union(function ($q) {
-                return $q->table('archived_users')
+                return $q->from('archived_users')
                          ->select('id', 'created_at')
                          ->where('status', 'archived')
                 ;

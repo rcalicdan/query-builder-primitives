@@ -82,7 +82,7 @@ class QueryBuilder
 
 // Usage
 $qb = new QueryBuilder();
-$sql = $qb->table('users')
+$sql = $qb->from('users')
     ->select('id', 'name', 'email')
     ->where('status', 'active')
     ->where('age', '>=', 18)
@@ -136,7 +136,7 @@ class FullQueryBuilder
 
 // Usage with advanced features
 $qb = new FullQueryBuilder();
-$qb->table('users')
+$qb->from('users')
     ->select('users.*', 'orders.total')
     ->leftJoin('orders', 'orders.user_id = users.id')
     ->whereGroup(function($query) {
@@ -175,26 +175,26 @@ setDriver(string $driver): static       // 'mysql' | 'pgsql' | 'sqlite'
 **Examples:**
 ```php
 // Basic select
-$qb->table('users')
+$qb->from('users')
     ->select('id', 'name')
     ->addSelect('email')
     ->setDriver('pgsql');
 
 // Select all (default)
-$qb->table('users')->select();
+$qb->from('users')->select();
 
 // Raw expression in select
-$qb->table('orders')
+$qb->from('orders')
     ->select('user_id')
     ->selectRaw('SUM(total) as total_spent')
     ->selectRaw('COUNT(*) as order_count');
 
 // Select with raw bindings
-$qb->table('products')
+$qb->from('products')
     ->selectRaw('CASE WHEN price > ? THEN ? ELSE ? END as tier', [100, 'premium', 'standard']);
 
 // DISTINCT
-$qb->table('users')->selectDistinct('country');
+$qb->from('users')->selectDistinct('country');
 ```
 
 ---
@@ -287,7 +287,7 @@ whereSub(string $column, string $operator, callable $callback): static
 **Examples:**
 ```php
 // Nested conditions with grouping
-$qb->table('users')
+$qb->from('users')
     ->where('role', 'admin')
     ->whereGroup(function($query) {
         return $query
@@ -305,28 +305,28 @@ $qb->where('type', 'premium')
     });
 
 // EXISTS subquery
-$qb->table('users')
+$qb->from('users')
     ->whereExists(function($query) {
         return $query
-            ->table('orders')
+            ->from('orders')
             ->whereRaw('orders.user_id = users.id')
             ->where('orders.total', '>', 1000);
     });
 // WHERE EXISTS (SELECT * FROM orders WHERE orders.user_id = users.id AND orders.total > ?)
 
 // NOT EXISTS
-$qb->table('users')
+$qb->from('users')
     ->whereNotExists(function($query) {
         return $query
-            ->table('orders')
+            ->from('orders')
             ->whereRaw('orders.user_id = users.id');
     });
 
 // Subquery in WHERE
-$qb->table('users')
+$qb->from('users')
     ->whereSub('total_orders', '>', function($query) {
         return $query
-            ->table('orders')
+            ->from('orders')
             ->selectRaw('COUNT(*)')
             ->whereRaw('orders.user_id = users.id');
     });
@@ -352,21 +352,21 @@ crossJoin(string $table): static
 **Examples:**
 ```php
 // INNER JOIN
-$qb->table('users')
+$qb->from('users')
     ->innerJoin('profiles', 'profiles.user_id = users.id');
 
 // LEFT JOIN
-$qb->table('users')
+$qb->from('users')
     ->leftJoin('orders', 'orders.user_id = users.id');
 
 // Multiple joins
-$qb->table('users')
+$qb->from('users')
     ->leftJoin('profiles', 'profiles.user_id = users.id')
     ->leftJoin('orders', 'orders.user_id = users.id')
     ->leftJoin('payments', 'payments.order_id = orders.id');
 
 // CROSS JOIN
-$qb->table('colors')
+$qb->from('colors')
     ->crossJoin('sizes');
 ```
 
@@ -456,14 +456,14 @@ withoutLock(): static
 **Examples:**
 ```php
 // Exclusive lock — no other transaction can read or modify these rows
-$qb->table('orders')
+$qb->from('orders')
     ->where('id', 1)
     ->lockForUpdate()
     ->toSql();
 // MySQL/PgSQL: SELECT * FROM orders WHERE id = ? FOR UPDATE
 
 // Shared lock — other transactions can read but not modify
-$qb->table('inventory')
+$qb->from('inventory')
     ->where('product_id', 42)
     ->lockForShare()
     ->toSql();
@@ -471,7 +471,7 @@ $qb->table('inventory')
 // PgSQL:  SELECT * FROM inventory WHERE product_id = ? FOR SHARE
 
 // Fail immediately if rows are already locked (MySQL 8+ / PostgreSQL)
-$qb->table('orders')
+$qb->from('orders')
     ->where('status', 'pending')
     ->lockForUpdate()
     ->noWait()
@@ -479,7 +479,7 @@ $qb->table('orders')
 // SELECT * FROM orders WHERE status = ? FOR UPDATE NOWAIT
 
 // Queue worker pattern — skip rows locked by other workers
-$qb->table('jobs')
+$qb->from('jobs')
     ->where('status', 'pending')
     ->orderBy('created_at')
     ->limit(1)
@@ -489,7 +489,7 @@ $qb->table('jobs')
 // SELECT * FROM jobs WHERE status = ? ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED
 
 // PostgreSQL: lock only the orders table when joining (OF clause)
-$qb->table('orders')
+$qb->from('orders')
     ->setDriver('pgsql')
     ->join('users', 'orders.user_id = users.id')
     ->lockForUpdate()
@@ -498,7 +498,7 @@ $qb->table('orders')
 // SELECT * FROM orders INNER JOIN users ON orders.user_id = users.id FOR UPDATE OF orders
 
 // PostgreSQL: OF with multiple tables
-$qb->table('orders')
+$qb->from('orders')
     ->setDriver('pgsql')
     ->join('items', 'orders.id = items.order_id')
     ->lockForUpdate()
@@ -508,7 +508,7 @@ $qb->table('orders')
 // SELECT * FROM orders INNER JOIN items ON orders.id = items.order_id FOR UPDATE OF orders, items NOWAIT
 
 // Remove a lock from a reused base query
-$base = $qb->table('orders')->lockForUpdate();
+$base = $qb->from('orders')->lockForUpdate();
 $unlocked = $base->withoutLock();
 ```
 
@@ -537,11 +537,11 @@ unionAll(callable $callback): static
 **Examples:**
 ```php
 // Basic UNION (deduplicates rows)
-$qb->table('active_users')
+$qb->from('active_users')
     ->select('id', 'name', 'email')
     ->union(function($query) {
         return $query
-            ->table('archived_users')
+            ->from('archived_users')
             ->select('id', 'name', 'email');
     })
     ->toSql();
@@ -549,11 +549,11 @@ $qb->table('active_users')
 // UNION SELECT id, name, email FROM archived_users
 
 // UNION ALL (keeps duplicate rows)
-$qb->table('orders_2023')
+$qb->from('orders_2023')
     ->select('id', 'total', 'created_at')
     ->unionAll(function($query) {
         return $query
-            ->table('orders_2024')
+            ->from('orders_2024')
             ->select('id', 'total', 'created_at');
     })
     ->orderBy('created_at', 'DESC')
@@ -563,18 +563,18 @@ $qb->table('orders_2023')
 // ORDER BY created_at DESC
 
 // Chaining multiple UNIONs
-$qb->table('employees')
+$qb->from('employees')
     ->select('id', 'name', 'department')
     ->where('active', true)
     ->union(function($query) {
         return $query
-            ->table('contractors')
+            ->from('contractors')
             ->select('id', 'name', 'department')
             ->where('active', true);
     })
     ->union(function($query) {
         return $query
-            ->table('interns')
+            ->from('interns')
             ->select('id', 'name', 'department');
     })
     ->orderBy('name')
@@ -585,12 +585,12 @@ $qb->table('employees')
 // ORDER BY name ASC
 
 // UNION with conditions and bindings
-$qb->table('products')
+$qb->from('products')
     ->select('id', 'name', 'price')
     ->where('category', 'electronics')
     ->unionAll(function($query) {
         return $query
-            ->table('products')
+            ->from('products')
             ->select('id', 'name', 'price')
             ->where('category', 'accessories')
             ->where('price', '<', 50);
@@ -625,7 +625,7 @@ dd(): never
 **Examples:**
 ```php
 // Get SQL query
-$sql = $qb->table('users')
+$sql = $qb->from('users')
     ->where('status', 'active')
     ->toSql();
 echo $sql; // SELECT * FROM users WHERE status = ?
@@ -639,14 +639,14 @@ $rawSql = $qb->toRawSql();
 echo $rawSql; // SELECT * FROM users WHERE status = 'active'
 
 // Dump and continue
-$qb->table('users')
+$qb->from('users')
     ->where('status', 'active')
     ->dump() // Prints debug info
     ->where('age', '>=', 18)
     ->dump();
 
 // Dump and die (stops execution)
-$qb->table('users')
+$qb->from('users')
     ->where('status', 'active')
     ->dd();
 
@@ -685,7 +685,7 @@ buildUpsertQuery(array $data, string|array $uniqueColumns, ?array $updateColumns
 All methods return a **new instance** of the query builder, ensuring immutability:
 
 ```php
-$baseQuery = $qb->table('users')->where('status', 'active');
+$baseQuery = $qb->from('users')->where('status', 'active');
 
 $query1 = $baseQuery->where('age', '>=', 18);
 $query2 = $baseQuery->where('country', 'US');
@@ -694,9 +694,9 @@ $query2 = $baseQuery->where('country', 'US');
 // $query1 and $query2 are different queries
 
 // Same applies to locks and unions
-$base   = $qb->table('orders')->where('status', 'pending');
+$base   = $qb->from('orders')->where('status', 'pending');
 $locked = $base->lockForUpdate();
-$union  = $base->union(fn($q) => $q->table('archived_orders'));
+$union  = $base->union(fn($q) => $q->from('archived_orders'));
 
 // $base has no lock and no union; $locked and $union are independent forks
 ```
@@ -784,7 +784,7 @@ class ExecutableQueryBuilder extends FullQueryBuilder
 $pdo = new PDO('mysql:host=localhost;dbname=mydb', 'user', 'pass');
 $qb = new ExecutableQueryBuilder($pdo);
 
-$users = $qb->table('users')
+$users = $qb->from('users')
     ->where('status', 'active')
     ->orderBy('created_at', 'DESC')
     ->limit(10)
@@ -793,7 +793,7 @@ $users = $qb->table('users')
 // With locking inside a transaction
 $pdo->beginTransaction();
 
-$job = $qb->table('jobs')
+$job = $qb->from('jobs')
     ->where('status', 'pending')
     ->orderBy('created_at')
     ->limit(1)
@@ -873,7 +873,7 @@ class ComplexQueryBuilder
 
 ```php
 // (status = 'active' AND role = 'admin') OR (status = 'pending' AND invited = true)
-$qb->table('users')
+$qb->from('users')
     ->whereGroup(function($q) {
         return $q->where('status', 'active')
                  ->where('role', 'admin');
@@ -888,11 +888,11 @@ $qb->table('users')
 
 ```php
 // Rows where updated_at is more recent than created_at
-$qb->table('users')
+$qb->from('users')
     ->whereColumn('updated_at', '>', 'created_at');
 
 // Rows where a value matches its mirror column
-$qb->table('audit_log')
+$qb->from('audit_log')
     ->whereColumn('expected_hash', 'actual_hash')   // two-arg shorthand, defaults to =
     ->orWhereColumn('verified_at', 'created_at');
 ```
@@ -901,7 +901,7 @@ $qb->table('audit_log')
 
 ```php
 // Conditional expression
-$qb->table('orders')
+$qb->from('orders')
     ->select('id', 'user_id')
     ->selectRaw('SUM(total) as total_spent')
     ->selectRaw('COUNT(*) as order_count')
@@ -909,7 +909,7 @@ $qb->table('orders')
     ->groupBy('user_id');
 
 // Parameterised raw expression
-$qb->table('products')
+$qb->from('products')
     ->selectRaw('CASE WHEN stock > ? THEN ? ELSE ? END as availability', [0, 'in_stock', 'out_of_stock']);
 ```
 
@@ -917,19 +917,19 @@ $qb->table('products')
 
 ```php
 // Users who have placed orders over $1000
-$qb->table('users')
+$qb->from('users')
     ->whereExists(function($q) {
-        return $q->table('orders')
+        return $q->from('orders')
                  ->whereRaw('orders.user_id = users.id')
                  ->where('total', '>', 1000);
     });
 
 // Users with more orders than average
-$qb->table('users')
+$qb->from('users')
     ->whereSub('total_orders', '>', function($q) {
-        return $q->table('orders')
+        return $q->from('orders')
                  ->selectRaw('AVG(order_count)')
-                 ->table('(SELECT user_id, COUNT(*) as order_count FROM orders GROUP BY user_id) as subquery');
+                 ->from('(SELECT user_id, COUNT(*) as order_count FROM orders GROUP BY user_id) as subquery');
     });
 ```
 
@@ -939,7 +939,7 @@ $qb->table('users')
 // Payment processing — hold rows exclusively while charging
 $pdo->beginTransaction();
 
-$order = $qb->table('orders')
+$order = $qb->from('orders')
     ->where('id', $orderId)
     ->where('status', 'pending')
     ->lockForUpdate()
@@ -954,7 +954,7 @@ $pdo->commit();
 // Job queue — multiple workers each claim one job without colliding
 $pdo->beginTransaction();
 
-$job = $qb->table('jobs')
+$job = $qb->from('jobs')
     ->where('status', 'available')
     ->orderBy('priority', 'DESC')
     ->orderBy('created_at')
@@ -968,7 +968,7 @@ $pdo->commit();
 // Inventory check — read-consistent snapshot while others can still read
 $pdo->beginTransaction();
 
-$stock = $qb->table('inventory')
+$stock = $qb->from('inventory')
     ->where('product_id', $productId)
     ->lockForShare()
     ->first();
@@ -980,21 +980,21 @@ $pdo->commit();
 
 ```php
 // Combine results from partitioned tables
-$qb->table('logs_2024')
+$qb->from('logs_2024')
     ->select('id', 'user_id', 'action', 'created_at')
     ->unionAll(function($q) {
-        return $q->table('logs_2025')
+        return $q->from('logs_2025')
                  ->select('id', 'user_id', 'action', 'created_at');
     })
     ->orderBy('created_at', 'DESC')
     ->limit(100);
 
 // Merge different record types into a single feed
-$qb->table('posts')
+$qb->from('posts')
     ->select('id', 'title', 'created_at')
     ->selectRaw("'post' as type")
     ->union(function($q) {
-        return $q->table('comments')
+        return $q->from('comments')
                  ->select('id', 'body as title', 'created_at')
                  ->selectRaw("'comment' as type");
     })
@@ -1004,7 +1004,7 @@ $qb->table('posts')
 ### Reporting Queries
 
 ```php
-$qb->table('orders')
+$qb->from('orders')
     ->select('users.name')
     ->selectRaw('COUNT(orders.id) as total_orders')
     ->selectRaw('SUM(orders.total) as total_spent')

@@ -7,15 +7,6 @@ namespace Rcalicdan\QueryBuilderPrimitives\Interfaces;
 interface CoreInterface
 {
     /**
-     * Set the table for the query.
-     *
-     * @param string $table The table name.
-     *
-     * @return static Returns a new query builder instance for method chaining.
-     */
-    public function table(string $table): static;
-
-    /**
      * Set the table for the query (alias for table).
      *
      * @param string $table The table name.
