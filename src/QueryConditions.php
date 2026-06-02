@@ -450,6 +450,11 @@ trait QueryConditions
      */
     public function orWhereColumn(string $first, ?string $operator = null, ?string $second = null): static
     {
+        if (\func_num_args() === 2) {
+            $second = $operator;
+            $operator = '=';
+        }
+
         return $this->whereColumn($first, $operator, $second, 'OR');
     }
 
