@@ -149,4 +149,24 @@ describe('QueryGrouping', function () {
 
         expect($query->toSql())->toBe('SELECT * FROM users ORDER BY created_at DESC');
     });
+
+    test('orderByRaw compiles raw sorting with bindings', function () {
+        $query = MockQueryBuilder::table('users')
+            ->where('status', 'active')
+            ->orderByRaw('FIELD(role, ?, ?)', ['admin', 'moderator']);
+
+        expect($query->toSql())->toBe('SELECT * FROM users WHERE status = ? ORDER BY FIELD(role, ?, ?)');
+        expect($query->getBindings())->toBe(['active', 'admin', 'moderator']);
+    });
+
+    test('groupByRaw compiles raw grouping with bindings', function () {
+        $query = MockQueryBuilder::table('orders')
+            ->select('status, COUNT(*) as total')
+            ->where('amount', '>', 100)
+            ->groupByRaw('YEAR(created_at) + ?', [1])
+            ->havingRaw('COUNT(*) > ?', [5]);
+
+        expect($query->toSql())->toBe('SELECT status, COUNT(*) as total FROM orders WHERE amount > ? GROUP BY YEAR(created_at) + ? HAVING COUNT(*) > ?');
+        expect($query->getBindings())->toBe([100, 1, 5]);
+    });
 });

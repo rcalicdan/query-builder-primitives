@@ -15,7 +15,6 @@ trait QueryBuilderCore
      * @var array<string> The columns to select in the query.
      */
     protected array $select = ['*'];
-
     /**
      * @var array<string, array<mixed>> The parameter bindings for the query, grouped by type.
      */
@@ -28,7 +27,9 @@ trait QueryBuilderCore
         'whereRaw' => [],
         'orWhere' => [],
         'orWhereRaw' => [],
+        'groupBy' => [],
         'having' => [],
+        'orderBy' => [],
         'union' => [],
     ];
 
@@ -203,6 +204,11 @@ trait QueryBuilderCore
      *
      * @return array<mixed>
      */
+    /**
+     * Compiles the final bindings array in the correct order for execution.
+     *
+     * @return array<mixed>
+     */
     protected function getCompiledBindings(): array
     {
         if (\count($this->conditionOrder) > 0) {
@@ -214,8 +220,10 @@ trait QueryBuilderCore
             return [
                 ...$this->bindings['select'],
                 ...$whereBindings,
+                ...$this->bindings['groupBy'], 
                 ...$this->bindings['having'],
                 ...$this->bindings['union'],
+                ...$this->bindings['orderBy'], 
             ];
         }
 
@@ -232,8 +240,10 @@ trait QueryBuilderCore
         return [
             ...$this->bindings['select'],
             ...$whereBindings,
+            ...$this->bindings['groupBy'],     
             ...$this->bindings['having'],
             ...$this->bindings['union'],
+            ...$this->bindings['orderBy'],     
         ];
     }
 }

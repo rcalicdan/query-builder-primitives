@@ -107,4 +107,28 @@ interface GroupingInterface
      * @return static Returns a new query builder instance for method chaining.
      */
     public function reorder(?string $column = null, string $direction = 'ASC'): static;
+
+    /**
+     * Add a raw ORDER BY clause with optional bindings.
+     *
+     * @param string $sql The raw SQL sorting string.
+     * @param array<mixed> $bindings The optional parameter bindings.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     *
+     * @throws \InvalidArgumentException When named bindings are provided.
+     */
+    public function orderByRaw(string $sql, array $bindings = []): static;
+
+    /**
+     * Add a raw GROUP BY clause with optional bindings.
+     *
+     * @param string $sql The raw SQL grouping string.
+     * @param array<mixed> $bindings The optional parameter bindings.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     *
+     * @throws \InvalidArgumentException When named bindings are provided.
+     */
+    public function groupByRaw(string $sql, array $bindings = []): static;
 }

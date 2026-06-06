@@ -73,6 +73,52 @@ trait QueryGrouping
     }
 
     /**
+     * Add a raw ORDER BY clause with optional bindings.
+     *
+     * @param string $sql The raw SQL sorting string.
+     * @param array<mixed> $bindings The optional parameter bindings.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     *
+     * @throws \InvalidArgumentException When named bindings are provided.
+     */
+    public function orderByRaw(string $sql, array $bindings = []): static
+    {
+        if ($bindings !== [] && ! array_is_list($bindings)) {
+            throw new \InvalidArgumentException('Query builder primitives only support positional bindings. Named bindings are not allowed.');
+        }
+
+        $instance = clone $this;
+        $instance->orderBy[] = $sql;
+        $instance->bindings['orderBy'] = [...$instance->bindings['orderBy'], ...$bindings];
+
+        return $instance;
+    }
+
+    /**
+     * Add a raw GROUP BY clause with optional bindings.
+     *
+     * @param string $sql The raw SQL grouping string.
+     * @param array<mixed> $bindings The optional parameter bindings.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     *
+     * @throws \InvalidArgumentException When named bindings are provided.
+     */
+    public function groupByRaw(string $sql, array $bindings = []): static
+    {
+        if ($bindings !== [] && ! array_is_list($bindings)) {
+            throw new \InvalidArgumentException('Query builder primitives only support positional bindings. Named bindings are not allowed.');
+        }
+
+        $instance = clone $this;
+        $instance->groupBy[] = $sql;
+        $instance->bindings['groupBy'] = [...$instance->bindings['groupBy'], ...$bindings];
+
+        return $instance;
+    }
+
+    /**
      * Add an ORDER BY DESC clause for a column (defaults to 'created_at').
      *
      * @param string $column The column name.
