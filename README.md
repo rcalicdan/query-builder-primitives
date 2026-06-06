@@ -2,6 +2,54 @@
 
 A collection of PHP traits for building immutable, fluent query builders. This library provides low-level primitives without forcing any specific implementation.
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Philosophy](#philosophy)
+- [Supported Database Drivers](#supported-database-drivers)
+- [Architecture Overview](#architecture-overview)
+  - [Dependency Map](#dependency-map)
+  - [Trait Descriptions](#trait-descriptions)
+  - [Interfaces](#interfaces)
+- [Quick Start](#quick-start)
+  - [Minimal Query Builder](#minimal-query-builder)
+  - [Full-Featured Query Builder](#full-featured-query-builder)
+- [Trait Details](#trait-details)
+  - [QueryBuilderCore](#querybuildercoreuse)
+    - [The newQuery() Method](#the-newquery-method--required-override-for-custom-constructors)
+  - [QueryConditions](#queryconditions)
+  - [QueryAdvancedConditions](#queryadvancedconditions)
+  - [QueryJoin](#queryjoin)
+  - [QueryGrouping](#querygrouping)
+  - [QueryLocking](#querylocking)
+  - [QueryUnion](#queryunion)
+  - [QueryDebug](#querydebug)
+  - [SqlBuilder](#sqlbuilder)
+    - [buildExistsQuery()](#buildexistsquery)
+    - [buildIncrementQuery()](#buildincrementquerystring-column-intfloat-amount--1-array-extra--)
+    - [buildDecrementQuery()](#builddecrementquerystring-column-intfloat-amount--1-array-extra--)
+- [Immutability](#immutability)
+- [Extending with Execution](#extending-with-execution)
+- [Recommended Compositions](#recommended-compositions)
+  - [1. Read-Only Query Builder](#1-read-only-query-builder)
+  - [2. Simple Query Builder](#2-simple-query-builder-no-advanced-features)
+  - [3. Reporting Query Builder](#3-reporting-query-builder-heavy-on-joingsgrouping)
+  - [4. Full-Featured](#4-full-featured-all-traits)
+- [Common Patterns](#common-patterns)
+  - [Complex WHERE Logic](#complex-where-logic)
+  - [OR HAVING](#or-having)
+  - [Subquery Patterns](#subquery-patterns)
+  - [Existence Checks](#existence-checks)
+  - [Atomic Counters](#atomic-counters)
+  - [Pessimistic Locking Patterns](#pessimistic-locking-patterns)
+  - [UNION Patterns](#union-patterns)
+  - [Reporting Queries](#reporting-queries)
+- [Requirements](#requirements)
+- [License](#license)
+- [Contributing](#contributing)
+
+---
+
 ## Installation
 
 ```bash
@@ -16,6 +64,8 @@ This library provides **building blocks**, not a complete query builder. You com
 *   MySQL/MariaDB
 *   PostgreSQL
 *   SQLite
+
+---
 
 ## Architecture Overview
 
@@ -68,6 +118,8 @@ Each trait has a corresponding contract under `Rcalicdan\QueryBuilderPrimitives\
 | `QueryBuilderPrimitiveInterface` | Extends all of the above |
 
 `QueryBuilderBase` implements `QueryBuilderPrimitiveInterface` and uses all traits, making it a ready-made full implementation you can extend.
+
+---
 
 ## Quick Start
 
@@ -134,6 +186,8 @@ $qb->from('users')
     ->limit(10)
     ->dd(); // Debug and die
 ```
+
+---
 
 ## Trait Details
 
@@ -318,7 +372,7 @@ Advanced nested conditions and subqueries.
 
 **Dependencies:** Requires `QueryConditions` and `SqlBuilder`
 
-> **Note:** These methods use `newQuery()` internally. If your builder has constructor arguments, override `newQuery()` — see the `QueryBuilderCore` section above.
+> **Note:** These methods use `newQuery()` internally. If your builder has constructor arguments, override `newQuery()` — see the [QueryBuilderCore](#querybuildercoreuse) section above.
 
 **Methods:**
 ```php
@@ -544,7 +598,7 @@ $qb->from('orders')
 // SELECT * FROM orders INNER JOIN users ON orders.user_id = users.id FOR UPDATE OF orders
 
 // Remove lock from a reused base query
-$base   = $qb->from('orders')->lockForUpdate();
+$base     = $qb->from('orders')->lockForUpdate();
 $unlocked = $base->withoutLock();
 ```
 
@@ -562,7 +616,7 @@ UNION and UNION ALL operations.
 
 **Dependencies:** Requires `QueryBuilderCore` and `SqlBuilder`
 
-> **Note:** This trait uses `newQuery()` internally. If your builder has constructor arguments, override `newQuery()` — see the `QueryBuilderCore` section above.
+> **Note:** This trait uses `newQuery()` internally. If your builder has constructor arguments, override `newQuery()` — see the [QueryBuilderCore](#querybuildercoreuse) section above.
 
 **Methods:**
 ```php
@@ -696,9 +750,98 @@ buildWhereClause(): string
 buildHavingClause(): string
 buildAggregateQuery(string $function, string $column): string
 buildUpsertQuery(array $data, string|array $uniqueColumns, ?array $updateColumns = null): string
+buildExistsQuery(): string
+buildIncrementQuery(string $column, int|float $amount = 1, array $extra = []): string
+buildDecrementQuery(string $column, int|float $amount = 1, array $extra = []): string
 ```
 
 > `buildHavingClause()` handles both `AND` and `OR` conditions, driven by the `$boolean` parameter on `having()` and `havingRaw()`.
+
+#### `buildExistsQuery()`
+
+Wraps the current query in `SELECT EXISTS(...)`. Internally resets the select to `1` and strips `ORDER BY` (unless `LIMIT`/`OFFSET` is set) to keep the subquery lean.
+
+```php
+// In your concrete builder:
+public function exists(): bool
+{
+    $stmt = $this->pdo->prepare($this->buildExistsQuery());
+    $stmt->execute($this->getCompiledBindings());
+    return (bool) $stmt->fetchColumn();
+}
+
+// Usage
+$exists = $qb->from('users')
+    ->where('email', 'john@example.com')
+    ->exists();
+// SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)
+
+$exists = $qb->from('orders')
+    ->where('user_id', 42)
+    ->where('status', 'pending')
+    ->exists();
+// SELECT EXISTS(SELECT 1 FROM orders WHERE user_id = ? AND status = ?)
+```
+
+> `ORDER BY` is silently stripped when no `LIMIT`/`OFFSET` is present, since ordering has no effect on existence checks.
+
+#### `buildIncrementQuery(string $column, int|float $amount = 1, array $extra = [])`
+
+Builds an `UPDATE` that adds `$amount` to a column atomically. The optional `$extra` array lets you update additional columns in the same statement — their values bind to the `SET` placeholders, which appear **before** the `WHERE` bindings in the final `execute()` call.
+
+```php
+// In your concrete builder:
+public function increment(string $column, int|float $amount = 1, array $extra = []): int
+{
+    $stmt = $this->pdo->prepare($this->buildIncrementQuery($column, $amount, $extra));
+    $stmt->execute([...array_values($extra), ...$this->getCompiledBindings()]);
+    return $stmt->rowCount();
+}
+
+// Usage
+$qb->from('products')
+    ->where('id', 5)
+    ->increment('stock');
+// UPDATE products SET stock = stock + 1 WHERE id = ?
+
+$qb->from('products')
+    ->where('id', 5)
+    ->increment('stock', 10);
+// UPDATE products SET stock = stock + 10 WHERE id = ?
+
+// With extra columns updated simultaneously
+$qb->from('products')
+    ->where('id', 5)
+    ->increment('stock', 3, ['updated_at' => now()]);
+// UPDATE products SET stock = stock + 3, updated_at = ? WHERE id = ?
+```
+
+#### `buildDecrementQuery(string $column, int|float $amount = 1, array $extra = [])`
+
+Mirror of `buildIncrementQuery()` — subtracts `$amount` from the column instead. Binding order follows the same rule: `$extra` values first, then WHERE bindings.
+
+```php
+// In your concrete builder:
+public function decrement(string $column, int|float $amount = 1, array $extra = []): int
+{
+    $stmt = $this->pdo->prepare($this->buildDecrementQuery($column, $amount, $extra));
+    $stmt->execute([...array_values($extra), ...$this->getCompiledBindings()]);
+    return $stmt->rowCount();
+}
+
+// Usage
+$qb->from('products')
+    ->where('id', 5)
+    ->decrement('stock');
+// UPDATE products SET stock = stock - 1 WHERE id = ?
+
+$qb->from('accounts')
+    ->where('user_id', 12)
+    ->decrement('balance', 50.00, ['last_withdrawal' => now()]);
+// UPDATE accounts SET balance = balance - 50, last_withdrawal = ? WHERE user_id = ?
+```
+
+---
 
 ## Immutability
 
@@ -713,12 +856,14 @@ $query2 = $base->where('country', 'US');
 // $base remains unchanged; $query1 and $query2 are independent
 
 // Same applies to locks and unions
-$plain  = $qb->from('orders')->where('status', 'pending');
-$locked = $plain->lockForUpdate();
-$union  = $plain->union(fn($q) => $q->from('archived_orders'));
+$plain    = $qb->from('orders')->where('status', 'pending');
+$locked   = $plain->lockForUpdate();
+$union    = $plain->union(fn($q) => $q->from('archived_orders'));
 
 // $plain has no lock and no union; $locked and $union are independent forks
 ```
+
+---
 
 ## Extending with Execution
 
@@ -762,16 +907,30 @@ class ExecutableQueryBuilder extends QueryBuilderBase
         return (int) $stmt->fetchColumn();
     }
 
+    public function exists(): bool
+    {
+        $stmt = $this->pdo->prepare($this->buildExistsQuery());
+        $stmt->execute($this->getCompiledBindings());
+        return (bool) $stmt->fetchColumn();
+    }
+
     public function insert(array $data): bool
     {
         $stmt = $this->pdo->prepare($this->buildInsertQuery($data));
         return $stmt->execute(array_values($data));
     }
 
+    public function insertBatch(array $data): bool
+    {
+        $stmt = $this->pdo->prepare($this->buildInsertBatchQuery($data));
+        $values = array_merge(...array_map('array_values', $data));
+        return $stmt->execute($values);
+    }
+
     public function update(array $data): int
     {
         $stmt = $this->pdo->prepare($this->buildUpdateQuery($data));
-        $stmt->execute(array_merge(array_values($data), $this->getCompiledBindings()));
+        $stmt->execute([...array_values($data), ...$this->getCompiledBindings()]);
         return $stmt->rowCount();
     }
 
@@ -779,6 +938,20 @@ class ExecutableQueryBuilder extends QueryBuilderBase
     {
         $stmt = $this->pdo->prepare($this->buildDeleteQuery());
         $stmt->execute($this->getCompiledBindings());
+        return $stmt->rowCount();
+    }
+
+    public function increment(string $column, int|float $amount = 1, array $extra = []): int
+    {
+        $stmt = $this->pdo->prepare($this->buildIncrementQuery($column, $amount, $extra));
+        $stmt->execute([...array_values($extra), ...$this->getCompiledBindings()]);
+        return $stmt->rowCount();
+    }
+
+    public function decrement(string $column, int|float $amount = 1, array $extra = []): int
+    {
+        $stmt = $this->pdo->prepare($this->buildDecrementQuery($column, $amount, $extra));
+        $stmt->execute([...array_values($extra), ...$this->getCompiledBindings()]);
         return $stmt->rowCount();
     }
 }
@@ -793,6 +966,11 @@ $users = $qb->from('users')
     ->limit(10)
     ->get();
 
+// EXISTS check
+$hasOrders = $qb->from('orders')
+    ->where('user_id', 42)
+    ->exists();
+
 // EXISTS subquery — works because newQuery() is overridden
 $highValue = $qb->from('users')
     ->whereExists(function($q) {
@@ -801,6 +979,10 @@ $highValue = $qb->from('users')
                  ->where('total', '>', 1000);
     })
     ->get();
+
+// Increment / decrement
+$qb->from('products')->where('id', 5)->increment('stock', 10);
+$qb->from('accounts')->where('user_id', 12)->decrement('balance', 50.00);
 
 // Locking inside a transaction
 $pdo->beginTransaction();
@@ -814,6 +996,8 @@ $job = $qb->from('jobs')
 // process $job ...
 $pdo->commit();
 ```
+
+---
 
 ## Recommended Compositions
 
@@ -876,6 +1060,8 @@ class MyQueryBuilder extends QueryBuilderBase
 }
 ```
 
+---
+
 ## Common Patterns
 
 ### Complex WHERE Logic
@@ -928,6 +1114,42 @@ $qb->from('users')
 $qb->from('audit_log')
     ->whereColumn('expected_hash', 'actual_hash')
     ->orWhereColumn('verified_at', '>', 'created_at');
+```
+
+### Existence Checks
+
+```php
+// Simple record check — no need to fetch data
+if ($qb->from('users')->where('email', $email)->exists()) {
+    throw new \RuntimeException('Email already registered.');
+}
+
+// Check with joins
+$isEnrolled = $qb->from('enrollments')
+    ->where('user_id', $userId)
+    ->where('course_id', $courseId)
+    ->whereNull('cancelled_at')
+    ->exists();
+```
+
+### Atomic Counters
+
+```php
+// Increment page views
+$qb->from('posts')
+    ->where('id', $postId)
+    ->increment('views');
+
+// Decrement remaining seats and record the timestamp
+$qb->from('events')
+    ->where('id', $eventId)
+    ->decrement('seats_remaining', 1, ['last_booking_at' => now()]);
+
+// Batch-safe stock adjustment
+$qb->from('products')
+    ->where('sku', $sku)
+    ->where('stock', '>', 0)
+    ->decrement('stock', $quantity);
 ```
 
 ### Pessimistic Locking Patterns
@@ -998,6 +1220,8 @@ $qb->from('orders')
     ->limit(100);
 ```
 
+---
+
 ## Requirements
 
 *   PHP 8.2 or higher
@@ -1008,4 +1232,4 @@ MIT
 
 ## Contributing
 
-This is a primitive library, keep it simple and focused on building blocks, not opinions.
+This is a primitive library — keep it simple and focused on building blocks, not opinions.
