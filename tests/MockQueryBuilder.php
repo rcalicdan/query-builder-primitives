@@ -6,6 +6,7 @@ namespace Tests;
 
 use Rcalicdan\QueryBuilderPrimitives\QueryAdvancedConditions;
 use Rcalicdan\QueryBuilderPrimitives\QueryBuilderCore;
+use Rcalicdan\QueryBuilderPrimitives\QueryConditionable;
 use Rcalicdan\QueryBuilderPrimitives\QueryConditions;
 use Rcalicdan\QueryBuilderPrimitives\QueryDebug;
 use Rcalicdan\QueryBuilderPrimitives\QueryGrouping;
@@ -19,6 +20,7 @@ class MockQueryBuilder
     use QueryAdvancedConditions;
     use QueryBuilderCore;
     use QueryConditions;
+    use QueryConditionable;
     use QueryDebug;
     use QueryGrouping;
     use QueryJoin;

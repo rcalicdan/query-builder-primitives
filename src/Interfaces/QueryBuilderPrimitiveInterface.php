@@ -11,6 +11,7 @@ namespace Rcalicdan\QueryBuilderPrimitives\Interfaces;
  */
 interface QueryBuilderPrimitiveInterface extends
     CoreInterface,
+    ConditionalInterface,
     ConditionInterface,
     AdvancedConditionInterface,
     JoinInterface,

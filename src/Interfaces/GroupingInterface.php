@@ -44,6 +44,24 @@ interface GroupingInterface
     public function orderByDesc(string $column): static;
 
     /**
+     * Add an ORDER BY DESC clause for a column (defaults to 'created_at') alias for orderByDesc.
+     *
+     * @param string $column The column name.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function latest(string $column = 'created_at'): static;
+
+    /**
+     * Add an ORDER BY ASC clause for a column (defaults to 'created_at') alias for orderByAsc.
+     *
+     * @param string $column The column name.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function oldest(string $column = 'created_at'): static;
+
+    /**
      * Set the LIMIT and optionally OFFSET for the query.
      *
      * @param int $limit The maximum number of records to return.

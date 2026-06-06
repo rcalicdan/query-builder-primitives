@@ -55,7 +55,7 @@ trait QueryGrouping
     public function orderBy(string $column, string $direction = 'ASC'): static
     {
         $instance = clone $this;
-        $instance->orderBy[] = "{$column} ".strtoupper($direction);
+        $instance->orderBy[] = "{$column} " . strtoupper($direction);
 
         return $instance;
     }
@@ -68,6 +68,30 @@ trait QueryGrouping
      * @return static Returns a new query builder instance for method chaining.
      */
     public function orderByAsc(string $column): static
+    {
+        return $this->orderBy($column, 'ASC');
+    }
+
+    /**
+     * Add an ORDER BY DESC clause for a column (defaults to 'created_at').
+     *
+     * @param string $column The column name.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function latest(string $column = 'created_at'): static
+    {
+        return $this->orderBy($column, 'DESC');
+    }
+
+    /**
+     * Add an ORDER BY ASC clause for a column (defaults to 'created_at').
+     *
+     * @param string $column The column name.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function oldest(string $column = 'created_at'): static
     {
         return $this->orderBy($column, 'ASC');
     }

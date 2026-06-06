@@ -99,4 +99,35 @@ describe('QueryGrouping', function () {
         expect($sql)->toContain('LIMIT 10');
         expect($sql)->toContain('OFFSET 0');
     });
+
+    test('adds latest ordering with default column', function () {
+        $query = MockQueryBuilder::table('users')
+            ->latest()
+        ;
+
+        expect($query->toSql())->toContain('ORDER BY created_at DESC');
+    });
+
+    test('adds latest ordering with custom column', function () {
+        $query = MockQueryBuilder::table('users')
+            ->latest('published_at')
+        ;
+
+        expect($query->toSql())->toContain('ORDER BY published_at DESC');
+    });
+
+    test('adds oldest ordering with default column', function () {
+        $query = MockQueryBuilder::table('users')
+            ->oldest()
+        ;
+
+        expect($query->toSql())->toContain('ORDER BY created_at ASC');
+    });
+
+    test('adds oldest ordering with custom column', function () {
+        $query = MockQueryBuilder::table('users')
+            ->oldest('updated_at');
+
+        expect($query->toSql())->toContain('ORDER BY updated_at ASC');
+    });
 });

@@ -14,6 +14,7 @@ class QueryBuilderBase implements QueryBuilderPrimitiveInterface
     use QueryAdvancedConditions;
     use QueryBuilderCore;
     use QueryConditions;
+    use QueryConditionable;
     use QueryDebug;
     use QueryGrouping;
     use QueryJoin;
