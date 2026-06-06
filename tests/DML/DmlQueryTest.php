@@ -27,9 +27,26 @@ describe('DML Query Tests', function () {
         test('throws exception on invalid batch data format', function () {
             $builder = MockQueryBuilder::table('users');
 
-            expect(fn () => $builder->buildInsertBatchQuery(['name' => 'John']))
-                ->toThrow(InvalidArgumentException::class, 'Invalid data format for batch insert')
-            ;
+            expect(fn() => $builder->buildInsertBatchQuery(['name' => 'John']))
+                ->toThrow(InvalidArgumentException::class, 'Invalid data format for batch insert');
+        });
+
+        test('builds mysql insert ignore query', function () {
+            $builder = MockQueryBuilder::table('users')->setDriver('mysql');
+            $sql = $builder->buildInsertIgnoreQuery(['email' => 'test@test.com']);
+            expect($sql)->toBe('INSERT IGNORE INTO users (email) VALUES (?)');
+        });
+
+        test('builds pgsql insert ignore query', function () {
+            $builder = MockQueryBuilder::table('users')->setDriver('pgsql');
+            $sql = $builder->buildInsertIgnoreQuery(['email' => 'test@test.com']);
+            expect($sql)->toBe('INSERT INTO users (email) VALUES (?) ON CONFLICT DO NOTHING');
+        });
+
+        test('builds sqlite insert ignore query', function () {
+            $builder = MockQueryBuilder::table('users')->setDriver('sqlite');
+            $sql = $builder->buildInsertIgnoreQuery(['email' => 'test@test.com']);
+            expect($sql)->toBe('INSERT OR IGNORE INTO users (email) VALUES (?)');
         });
     });
 
@@ -44,8 +61,7 @@ describe('DML Query Tests', function () {
         test('builds update query with where clauses', function () {
             $builder = MockQueryBuilder::table('users')
                 ->where('id', 1)
-                ->where('role', 'admin')
-            ;
+                ->where('role', 'admin');
 
             $sql = $builder->buildUpdateQuery(['status' => 'active', 'updated_at' => '2024-01-01']);
 
@@ -64,8 +80,7 @@ describe('DML Query Tests', function () {
         test('builds delete query with where clauses', function () {
             $builder = MockQueryBuilder::table('users')
                 ->where('status', 'banned')
-                ->where('last_login', '<', '2023-01-01')
-            ;
+                ->where('last_login', '<', '2023-01-01');
 
             $sql = $builder->buildDeleteQuery();
 
@@ -149,25 +164,22 @@ describe('DML Query Tests', function () {
         test('throws exception if data is empty', function () {
             $builder = MockQueryBuilder::table('users');
 
-            expect(fn () => $builder->buildUpsertQuery([], 'id'))
-                ->toThrow(InvalidArgumentException::class, 'Data cannot be empty for upsert')
-            ;
+            expect(fn() => $builder->buildUpsertQuery([], 'id'))
+                ->toThrow(InvalidArgumentException::class, 'Data cannot be empty for upsert');
         });
 
         test('throws exception if unique columns is empty', function () {
             $builder = MockQueryBuilder::table('users');
 
-            expect(fn () => $builder->buildUpsertQuery(['id' => 1], []))
-                ->toThrow(InvalidArgumentException::class, 'Unique columns must be specified for upsert')
-            ;
+            expect(fn() => $builder->buildUpsertQuery(['id' => 1], []))
+                ->toThrow(InvalidArgumentException::class, 'Unique columns must be specified for upsert');
         });
 
         test('throws exception for unsupported drivers', function () {
             $builder = MockQueryBuilder::table('users')->setDriver('oracle');
 
-            expect(fn () => $builder->buildUpsertQuery(['id' => 1], 'id'))
-                ->toThrow(InvalidArgumentException::class, 'Unsupported driver: oracle.')
-            ;
+            expect(fn() => $builder->buildUpsertQuery(['id' => 1], 'id'))
+                ->toThrow(InvalidArgumentException::class, 'Unsupported driver: oracle.');
         });
     });
 

@@ -38,6 +38,7 @@ class MockQueryBuilder
         buildUpsertQuery as protected traitBuildUpsertQuery;
         buildIncrementQuery as protected traitBuildIncrementQuery;
         buildDecrementQuery as protected traitBuildDecrementQuery;
+        buildInsertIgnoreQuery as protected traitBuildInsertIgnoreQuery;
     }
 
     public function __construct(?string $table = null)
@@ -119,5 +120,10 @@ class MockQueryBuilder
     public function buildDecrementQuery(string $column, int|float $amount = 1, array $extra = []): string
     {
         return $this->traitBuildDecrementQuery($column, $amount, $extra);
+    }
+
+    public function buildInsertIgnoreQuery(array $data): string
+    {
+        return $this->traitBuildInsertIgnoreQuery($data);
     }
 }

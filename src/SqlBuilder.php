@@ -540,4 +540,96 @@ trait SqlBuilder
 
         return $sql;
     }
+
+    /**
+     * Build the INSERT IGNORE SQL query string.
+     * Supports both single and batch inserts with duplicate conflict silencing.
+     *
+     * @param array<string, mixed>|array<array<string, mixed>> $data The data to insert.
+     *
+     * @return string The complete INSERT IGNORE SQL query.
+     *
+     * @throws \InvalidArgumentException When data is empty.
+     */
+    protected function buildInsertIgnoreQuery(array $data): string
+    {
+        if ($data === []) {
+            throw new \InvalidArgumentException('Data cannot be empty for insert ignore');
+        }
+
+        $isBatch = \is_array(reset($data)) && \is_array(reset($data));
+
+        /** @var array<string, mixed>|array<array<string, mixed>> $data */
+        $driver = $this->getDriver();
+
+        return match ($driver) {
+            'mysql' => $this->buildMySqlInsertIgnore($data, $isBatch),
+            'pgsql' => $this->buildPostgreSqlInsertIgnore($data, $isBatch),
+            'sqlite' => $this->buildSqliteInsertIgnore($data, $isBatch),
+            default => throw new \InvalidArgumentException("Unsupported driver for insert ignore: {$driver}"),
+        };
+    }
+
+    /**
+     * @param array<string, mixed>|array<array<string, mixed>> $data
+     */
+    private function buildMySqlInsertIgnore(array $data, bool $isBatch): string
+    {
+        $firstRow = $isBatch ? $data[0] : $data;
+        $columns = implode(', ', array_keys($firstRow));
+
+        if ($isBatch) {
+            $rowPlaceholders = [];
+            foreach ($data as $row) {
+                $rowPlaceholders[] = '(' . implode(', ', array_fill(0, \count($row), '?')) . ')';
+            }
+            $allPlaceholders = implode(', ', $rowPlaceholders);
+        } else {
+            $allPlaceholders = '(' . implode(', ', array_fill(0, \count($data), '?')) . ')';
+        }
+
+        return "INSERT IGNORE INTO {$this->table} ({$columns}) VALUES {$allPlaceholders}";
+    }
+
+    /**
+     * @param array<string, mixed>|array<array<string, mixed>> $data
+     */
+    private function buildPostgreSqlInsertIgnore(array $data, bool $isBatch): string
+    {
+        $firstRow = $isBatch ? $data[0] : $data;
+        $columns = implode(', ', array_keys($firstRow));
+
+        if ($isBatch) {
+            $rowPlaceholders = [];
+            foreach ($data as $row) {
+                $rowPlaceholders[] = '(' . implode(', ', array_fill(0, \count($row), '?')) . ')';
+            }
+            $allPlaceholders = implode(', ', $rowPlaceholders);
+        } else {
+            $allPlaceholders = '(' . implode(', ', array_fill(0, \count($data), '?')) . ')';
+        }
+
+        return "INSERT INTO {$this->table} ({$columns}) VALUES {$allPlaceholders} ON CONFLICT DO NOTHING";
+    }
+
+    /**
+     * @param array<string, mixed>|array<array<string, mixed>> $data
+     */
+    private function buildSqliteInsertIgnore(array $data, bool $isBatch): string
+    {
+        $firstRow = $isBatch ? $data[0] : $data;
+        $columns = implode(', ', array_keys($firstRow));
+
+        if ($isBatch) {
+            $rowPlaceholders = [];
+            foreach ($data as $row) {
+                $rowPlaceholders[] = '(' . implode(', ', array_fill(0, \count($row), '?')) . ')';
+            }
+            $allPlaceholders = implode(', ', $rowPlaceholders);
+        } else {
+            $allPlaceholders = '(' . implode(', ', array_fill(0, \count($data), '?')) . ')';
+        }
+
+        return "INSERT OR IGNORE INTO {$this->table} ({$columns}) VALUES {$allPlaceholders}";
+    }
 }
