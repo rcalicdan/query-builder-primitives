@@ -64,6 +64,46 @@ composer require rcalicdan/query-builder-primitives
 
 This library provides **building blocks**, not a complete query builder. You compose the traits you need to create your own custom query builder implementation.
 
+Queries are built through **immutable method chaining** — every method returns a new instance rather than mutating the current one. This is a deliberate design choice with real practical benefits:
+
+- **Safe reuse.** A base query can be forked into multiple independent queries without any of them affecting each other. Build a `$base` once, branch it as many times as you need.
+- **No hidden state.** In a mutable builder, calling methods on a shared instance from different parts of your code produces unpredictable results. With immutable chaining, each chain is self-contained and its SQL is exactly what you wrote.
+- **Composable defaults.** You can define a pre-configured query (scoped to a tenant, filtered by status, ordered by default) and pass it around freely, knowing no callee can corrupt it.
+- **Easier debugging.** Because each step produces a discrete value, you can call `.dump()` or `.toSql()` at any point in the chain without affecting the final query.
+- **Safe for asynchronous execution.** When multiple coroutines or fibers execute concurrently and share a mutable builder, one coroutine's `where()` call can bleed into another's query mid-flight — a race condition that is silent, non-deterministic, and extremely difficult to reproduce. Because every method on this builder returns a new independent instance, each coroutine or fiber holds its own copy of the query state from the moment it branches off. There is no shared mutable object to race on, so concurrent query construction is safe by construction rather than by discipline.
+
+```php
+// Mutable builders share state — this is the problem immutability solves:
+$base->where('status', 'active');   // mutates $base
+$base->where('role', 'admin');      // mutates $base again — now both conditions are on it
+
+// Immutable chaining — each call returns a new instance, $base is never touched:
+$active = $base->where('status', 'active');
+$admins = $base->where('role', 'admin');
+
+// $base, $active, and $admins are three completely independent queries
+
+// Safe concurrent use — each fiber/coroutine gets its own query state:
+$base = $qb->from('orders')->where('status', 'pending');
+
+$fiber1 = async(function() use ($base) {
+    // Branches off $base into a new instance — completely isolated
+    $query = $base->where('user_id', 1)->latest();
+    // ... execute $query
+});
+
+$fiber2 = async(function() use ($base) {
+    // Also branches off $base — no interference with fiber1
+    $query = $base->where('user_id', 2)->oldest();
+    // ... execute $query
+});
+
+// Both fibers work from the same $base without any risk of one
+// overwriting the other's conditions, regardless of execution order
+```
+
+The trade-off is that you must always assign or chain the return value — discarding it silently does nothing. This is intentional: the builder never surprises you with side effects.
+
 ## Supported Database Drivers
 *   MySQL/MariaDB
 *   PostgreSQL
@@ -595,9 +635,11 @@ Grouping, ordering, pagination, random ordering, and reordering.
 **Methods:**
 ```php
 groupBy(string|array $columns): static
+groupByRaw(string $sql, array $bindings = []): static
 orderBy(string $column, string $direction = 'ASC'): static
 orderByAsc(string $column): static
 orderByDesc(string $column): static
+orderByRaw(string $sql, array $bindings = []): static
 latest(string $column = 'created_at'): static
 oldest(string $column = 'created_at'): static
 inRandomOrder(): static
@@ -607,25 +649,59 @@ offset(int $offset): static
 forPage(int $page, int $perPage = 15): static
 ```
 
-**Examples:**
-```php
-// GROUP BY
-$qb->select('user_id')
-    ->selectRaw('COUNT(*) as total')
-    ->groupBy('user_id');
+Also update the `GroupingInterface` row in the Interfaces table:
 
-// Multiple GROUP BY
+| Interface | Covers |
+| :--- | :--- |
+| `GroupingInterface` | `groupBy`, `groupByRaw`, `orderBy`, `orderByRaw`, `latest`, `oldest`, `limit`, `offset`, `forPage`, `inRandomOrder`, `reorder` |
+
+**Examples:**
+
+```php
+// Standard GROUP BY
+$qb->select('status')
+    ->selectRaw('COUNT(*) as total')
+    ->groupBy('status');
+
+// Multiple columns — string (comma-separated) or array
+$qb->groupBy('user_id, status');
 $qb->groupBy(['user_id', 'status']);
+
+// Raw GROUP BY — for expressions, ROLLUP, CUBE, etc.
+$qb->from('orders')
+    ->select('user_id')
+    ->selectRaw('SUM(total) as total_spent')
+    ->groupByRaw('ROLLUP(user_id)');
+
+// Raw GROUP BY with bindings
+$qb->from('events')
+    ->groupByRaw('DATE_FORMAT(created_at, ?)', ['%Y-%m']);
+// GROUP BY DATE_FORMAT(created_at, ?)
 
 // Standard ORDER BY
 $qb->orderBy('created_at', 'DESC')
     ->orderBy('name', 'ASC');
 
 // Shorthand direction methods
-$qb->orderByDesc('created_at')
-    ->orderByAsc('name');
+$qb->orderByDesc('created_at');
+$qb->orderByAsc('name');
 
-// latest() / oldest() — aliases defaulting to 'created_at'
+// Raw ORDER BY — for expressions, FIELD(), CASE WHEN, etc.
+$qb->from('orders')
+    ->orderByRaw('FIELD(status, ?, ?, ?)', ['pending', 'active', 'closed']);
+// ORDER BY FIELD(status, ?, ?, ?)
+
+$qb->from('products')
+    ->orderByRaw('CASE WHEN featured = 1 THEN 0 ELSE 1 END, name ASC');
+// ORDER BY CASE WHEN featured = 1 THEN 0 ELSE 1 END, name ASC
+
+// Chaining standard and raw ORDER BY together
+$qb->from('products')
+    ->orderByRaw('FIELD(status, ?, ?)', ['featured', 'active'])
+    ->orderByAsc('name');
+// ORDER BY FIELD(status, ?, ?), name ASC
+
+// latest() / oldest() — semantic aliases defaulting to 'created_at'
 $qb->from('posts')->latest();
 // ORDER BY created_at DESC
 
@@ -635,22 +711,26 @@ $qb->from('posts')->oldest();
 $qb->from('posts')->latest('published_at');
 // ORDER BY published_at DESC
 
-// Random order — adapts syntax per driver
+// Random order — syntax adapts per driver automatically
 $qb->from('products')->inRandomOrder();
-// MySQL:           ORDER BY RAND()
-// PgSQL / SQLite:  ORDER BY RANDOM()
+// MySQL:          ORDER BY RAND()
+// PgSQL / SQLite: ORDER BY RANDOM()
 
-// reorder() — clear existing ORDER BY and optionally set a new one
+// reorder() — wipe existing ORDER BY and optionally set a fresh one
 $base    = $qb->from('users')->orderByDesc('created_at');
-$fresh   = $base->reorder();                        // clears all ORDER BY
-$renewed = $base->reorder('name', 'ASC');           // clears then sets ORDER BY name ASC
+$fresh   = $base->reorder();                   // clears all ORDER BY
+$renewed = $base->reorder('name', 'ASC');      // clears then sets ORDER BY name ASC
+
+// reorder() + orderByRaw — clear and replace with a raw expression
+$base->reorder()->orderByRaw('RAND()');
 
 // LIMIT and OFFSET
 $qb->limit(10)->offset(20);
 $qb->limit(10, 20);    // combined shorthand — LIMIT 10 OFFSET 20
 
 // Pagination helper
-$qb->forPage(2, 25);   // Page 2, 25 per page = LIMIT 25 OFFSET 25
+$qb->forPage(2, 25);   // page 2, 25 per page = LIMIT 25 OFFSET 25
+$qb->forPage(1);       // page 1, default 15 per page = LIMIT 15 OFFSET 0
 ```
 
 ---
