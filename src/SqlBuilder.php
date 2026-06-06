@@ -468,4 +468,22 @@ trait SqlBuilder
 
         return $sql;
     }
+
+    /**
+     * Build the EXISTS SQL query string.
+     *
+     * @return string The complete EXISTS SQL query.
+     */
+    protected function buildExistsQuery(): string
+    {
+        $innerQuery = clone $this;
+        $innerQuery->select = ['1'];
+        $innerQuery->bindings['select'] = [];
+
+        if ($innerQuery->limit === null && $innerQuery->offset === null) {
+            $innerQuery->orderBy = [];
+        }
+
+        return 'SELECT EXISTS(' . $innerQuery->buildSelectQuery() . ')';
+    }
 }

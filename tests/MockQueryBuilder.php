@@ -31,6 +31,7 @@ class MockQueryBuilder
         buildInsertQuery as protected traitBuildInsertQuery;
         buildInsertBatchQuery as protected traitBuildInsertBatchQuery;
         buildUpdateQuery as protected traitBuildUpdateQuery;
+        buildExistsQuery as protected traitBuildExistsQuery;
         buildDeleteQuery as protected traitBuildDeleteQuery;
         buildUpsertQuery as protected traitBuildUpsertQuery;
     }
@@ -89,6 +90,11 @@ class MockQueryBuilder
     public function buildDeleteQuery(): string
     {
         return $this->traitBuildDeleteQuery();
+    }
+
+    public function buildExistsQuery(): string
+    {
+        return $this->traitBuildExistsQuery();
     }
 
     /**
