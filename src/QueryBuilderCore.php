@@ -21,6 +21,7 @@ trait QueryBuilderCore
      */
     protected array $bindings = [
         'select' => [],
+        'join' => [],
         'where' => [],
         'whereIn' => [],
         'whereNotIn' => [],
@@ -205,13 +206,9 @@ trait QueryBuilderCore
      *
      * @return array<mixed>
      */
-    /**
-     * Compiles the final bindings array in the correct order for execution.
-     *
-     * @return array<mixed>
-     */
     protected function getCompiledBindings(): array
     {
+        $joinBindings = $this->bindings['join'] ?? [];
         if (\count($this->conditionOrder) > 0) {
             $whereBindings = [];
             foreach ($this->conditionOrder as $item) {
@@ -220,6 +217,7 @@ trait QueryBuilderCore
 
             return [
                 ...$this->bindings['select'],
+                ...$joinBindings,
                 ...$whereBindings,
                 ...$this->bindings['groupBy'],
                 ...$this->bindings['having'],
@@ -240,6 +238,7 @@ trait QueryBuilderCore
 
         return [
             ...$this->bindings['select'],
+            ...$joinBindings,
             ...$whereBindings,
             ...$this->bindings['groupBy'],
             ...$this->bindings['having'],

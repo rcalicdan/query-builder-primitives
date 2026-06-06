@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Rcalicdan\QueryBuilderPrimitives;
 
+use Rcalicdan\QueryBuilderPrimitives\Interfaces\QueryBuilderPrimitiveInterface;
+
 trait QueryAdvancedConditions
 {
     /**
@@ -62,7 +64,7 @@ trait QueryAdvancedConditions
     /**
      * Add conditions with EXISTS clause.
      *
-     * @param callable(static): static $callback Callback function for the EXISTS subquery.
+     * @param callable(QueryBuilderPrimitiveInterface): QueryBuilderPrimitiveInterface $callback Callback function for the EXISTS subquery.
      * @param string $operator Logical operator ('AND' or 'OR').
      *
      * @return static Returns a new query builder instance for method chaining.
@@ -71,7 +73,11 @@ trait QueryAdvancedConditions
     {
         $subBuilder = $this->newQuery();
         $subBuilder = $subBuilder->setDriver($this->getDriver());
-        $subBuilder = $callback($subBuilder);
+
+        $result = $callback($subBuilder);
+
+        /** @var static $subBuilder */
+        $subBuilder = $result;
 
         if ($subBuilder->table === null || $subBuilder->table === '') {
             throw new \InvalidArgumentException('Subquery must specify a table using table() method.');
@@ -86,7 +92,7 @@ trait QueryAdvancedConditions
     /**
      * Add conditions with NOT EXISTS clause.
      *
-     * @param callable(static): static $callback Callback function for the NOT EXISTS subquery.
+     * @param callable(QueryBuilderPrimitiveInterface): QueryBuilderPrimitiveInterface $callback Callback function for the NOT EXISTS subquery.
      * @param string $operator Logical operator ('AND' or 'OR').
      *
      * @return static Returns a new query builder instance for method chaining.
@@ -95,7 +101,11 @@ trait QueryAdvancedConditions
     {
         $subBuilder = $this->newQuery();
         $subBuilder = $subBuilder->setDriver($this->getDriver());
-        $subBuilder = $callback($subBuilder);
+
+        $result = $callback($subBuilder);
+
+        /** @var static $subBuilder */
+        $subBuilder = $result;
 
         if ($subBuilder->table === null || $subBuilder->table === '') {
             throw new \InvalidArgumentException('Subquery must specify a table using table() method');
@@ -110,7 +120,7 @@ trait QueryAdvancedConditions
     /**
      * Add an OR WHERE EXISTS clause.
      *
-     * @param callable(static): static $callback Callback function for the EXISTS subquery.
+     * @param callable(QueryBuilderPrimitiveInterface): QueryBuilderPrimitiveInterface $callback Callback function for the EXISTS subquery.
      *
      * @return static Returns a new query builder instance for method chaining.
      */
@@ -122,7 +132,7 @@ trait QueryAdvancedConditions
     /**
      * Add an OR WHERE NOT EXISTS clause.
      *
-     * @param callable(static): static $callback Callback function for the NOT EXISTS subquery.
+     * @param callable(QueryBuilderPrimitiveInterface): QueryBuilderPrimitiveInterface $callback Callback function for the NOT EXISTS subquery.
      *
      * @return static Returns a new query builder instance for method chaining.
      */
@@ -136,7 +146,7 @@ trait QueryAdvancedConditions
      *
      * @param string $column The column name.
      * @param string $operator The comparison operator.
-     * @param callable(static): static $callback Callback function for the subquery.
+     * @param callable(QueryBuilderPrimitiveInterface): QueryBuilderPrimitiveInterface $callback Callback function for the subquery.
      *
      * @return static Returns a new query builder instance for method chaining.
      */
@@ -144,7 +154,11 @@ trait QueryAdvancedConditions
     {
         $subBuilder = $this->newQuery();
         $subBuilder = $subBuilder->setDriver($this->getDriver());
-        $subBuilder = $callback($subBuilder);
+
+        $result = $callback($subBuilder);
+
+        /** @var static $subBuilder */
+        $subBuilder = $result;
 
         if ($subBuilder->table === null || $subBuilder->table === '') {
             throw new \InvalidArgumentException('Subquery must specify a table using table() method');

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Rcalicdan\QueryBuilderPrimitives;
 
+use Rcalicdan\QueryBuilderPrimitives\Interfaces\JoinClauseInterface;
+
 trait QueryJoin
 {
     /**
@@ -15,19 +17,42 @@ trait QueryJoin
      * Add a join clause to the query.
      *
      * @param string $table The table to join.
-     * @param string $condition The join condition.
+     * @param string|(callable(JoinClauseInterface): JoinClauseInterface) $condition The join condition or a closure for advanced joins.
      * @param string $type The type of join (INNER, LEFT, RIGHT).
      *
      * @return static Returns a new query builder instance for method chaining.
      */
-    public function join(string $table, string $condition, string $type = 'INNER'): static
+    public function join(string $table, string|callable $condition, string $type = 'INNER'): static
     {
         $instance = clone $this;
-        $instance->joins[] = [
-            'type' => strtoupper($type),
-            'table' => $table,
-            'condition' => $condition,
-        ];
+
+        if (\is_callable($condition)) {
+            $joinClause = new JoinClause($table, $type);
+
+            $joinClause = $joinClause->setDriver($instance->getDriver());
+
+            $result = $condition($joinClause);
+
+            /** @var JoinClause $result */
+            $joinClause = $result;
+
+            $instance->joins[] = [
+                'type' => strtoupper($type),
+                'table' => $table,
+                'condition' => $joinClause->compileConditions(),
+            ];
+
+            $instance->bindings['join'] = [
+                ...($instance->bindings['join'] ?? []),
+                ...$joinClause->getJoinBindings(),
+            ];
+        } else {
+            $instance->joins[] = [
+                'type' => strtoupper($type),
+                'table' => $table,
+                'condition' => $condition,
+            ];
+        }
 
         return $instance;
     }
@@ -36,11 +61,11 @@ trait QueryJoin
      * Add a left join clause to the query.
      *
      * @param string $table The table to join.
-     * @param string $condition The join condition.
+     * @param string|(callable(JoinClauseInterface): JoinClauseInterface) $condition The join condition or a closure for advanced joins.
      *
      * @return static Returns a new query builder instance for method chaining.
      */
-    public function leftJoin(string $table, string $condition): static
+    public function leftJoin(string $table, string|callable $condition): static
     {
         return $this->join($table, $condition, 'LEFT');
     }
@@ -49,11 +74,11 @@ trait QueryJoin
      * Add a right join clause to the query.
      *
      * @param string $table The table to join.
-     * @param string $condition The join condition.
+     * @param string|(callable(JoinClauseInterface): JoinClauseInterface) $condition The join condition or a closure for advanced joins.
      *
      * @return static Returns a new query builder instance for method chaining.
      */
-    public function rightJoin(string $table, string $condition): static
+    public function rightJoin(string $table, string|callable $condition): static
     {
         return $this->join($table, $condition, 'RIGHT');
     }
@@ -62,11 +87,11 @@ trait QueryJoin
      * Add an inner join clause to the query.
      *
      * @param string $table The table to join.
-     * @param string $condition The join condition.
+     * @param string|(callable(JoinClauseInterface): JoinClauseInterface) $condition The join condition or a closure for advanced joins.
      *
      * @return static Returns a new query builder instance for method chaining.
      */
-    public function innerJoin(string $table, string $condition): static
+    public function innerJoin(string $table, string|callable $condition): static
     {
         return $this->join($table, $condition, 'INNER');
     }
