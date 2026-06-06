@@ -89,4 +89,22 @@ interface GroupingInterface
      * @return static Returns a new query builder instance for method chaining.
      */
     public function forPage(int $page, int $perPage = 15): static;
+
+    /**
+     * Sort the query results randomly.
+     * Automatically adapts syntax for MySQL (RAND()) and PostgreSQL/SQLite (RANDOM()).
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function inRandomOrder(): static;
+
+    /**
+     * Reset the ORDER BY clause. Optionally sets a new sorting column.
+     *
+     * @param string|null $column The optional column name to sort by.
+     * @param string $direction The sort direction (ASC or DESC).
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function reorder(?string $column = null, string $direction = 'ASC'): static;
 }

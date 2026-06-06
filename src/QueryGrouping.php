@@ -156,4 +156,45 @@ trait QueryGrouping
 
         return $this->limit($perPage, $offset);
     }
+
+    /**
+     * Sort the query results randomly.
+     * Automatically adapts syntax for MySQL (RAND()) and PostgreSQL/SQLite (RANDOM()).
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function inRandomOrder(): static
+    {
+        $driver = $this->getDriver();
+        $randomFunction = match ($driver) {
+            'mysql' => 'RAND()',
+            'pgsql', 'sqlite' => 'RANDOM()',
+            default => 'RANDOM()',
+        };
+
+        $instance = clone $this;
+        $instance->orderBy[] = $randomFunction;
+
+        return $instance;
+    }
+
+    /**
+     * Reset the ORDER BY clause. Optionally sets a new sorting column.
+     *
+     * @param string|null $column The optional column name to sort by.
+     * @param string $direction The sort direction (ASC or DESC).
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function reorder(?string $column = null, string $direction = 'ASC'): static
+    {
+        $instance = clone $this;
+        $instance->orderBy = [];
+
+        if ($column !== null) {
+            return $instance->orderBy($column, $direction);
+        }
+
+        return $instance;
+    }
 }
