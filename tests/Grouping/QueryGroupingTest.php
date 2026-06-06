@@ -7,56 +7,64 @@ use Tests\MockQueryBuilder;
 describe('QueryGrouping', function () {
     test('adds group by', function () {
         $query = MockQueryBuilder::table('orders')
-            ->groupBy('status');
+            ->groupBy('status')
+        ;
 
         expect($query->toSql())->toContain('GROUP BY status');
     });
 
     test('adds multiple group by columns', function () {
         $query = MockQueryBuilder::table('orders')
-            ->groupBy(['status', 'user_id']);
+            ->groupBy(['status', 'user_id'])
+        ;
 
         expect($query->toSql())->toContain('GROUP BY status, user_id');
     });
 
     test('adds group by from string', function () {
         $query = MockQueryBuilder::table('orders')
-            ->groupBy('status, user_id');
+            ->groupBy('status, user_id')
+        ;
 
         expect($query->toSql())->toContain('GROUP BY status, user_id');
     });
 
     test('adds order by', function () {
         $query = MockQueryBuilder::table('users')
-            ->orderBy('created_at', 'DESC');
+            ->orderBy('created_at', 'DESC')
+        ;
 
         expect($query->toSql())->toContain('ORDER BY created_at DESC');
     });
 
     test('adds order by asc', function () {
         $query = MockQueryBuilder::table('users')
-            ->orderByAsc('name');
+            ->orderByAsc('name')
+        ;
 
         expect($query->toSql())->toContain('ORDER BY name ASC');
     });
 
     test('adds order by desc', function () {
         $query = MockQueryBuilder::table('users')
-            ->orderByDesc('created_at');
+            ->orderByDesc('created_at')
+        ;
 
         expect($query->toSql())->toContain('ORDER BY created_at DESC');
     });
 
     test('adds limit', function () {
         $query = MockQueryBuilder::table('users')
-            ->limit(10);
+            ->limit(10)
+        ;
 
         expect($query->toSql())->toContain('LIMIT 10');
     });
 
     test('adds limit with offset', function () {
         $query = MockQueryBuilder::table('users')
-            ->limit(10, 20);
+            ->limit(10, 20)
+        ;
 
         $sql = $query->toSql();
         expect($sql)->toContain('LIMIT 10');
@@ -66,14 +74,16 @@ describe('QueryGrouping', function () {
     test('adds offset', function () {
         $query = MockQueryBuilder::table('users')
             ->limit(10)
-            ->offset(5);
+            ->offset(5)
+        ;
 
         expect($query->toSql())->toContain('OFFSET 5');
     });
 
     test('paginates results', function () {
         $query = MockQueryBuilder::table('users')
-            ->forPage(2, 15);
+            ->forPage(2, 15)
+        ;
 
         $sql = $query->toSql();
         expect($sql)->toContain('LIMIT 15');
@@ -82,7 +92,8 @@ describe('QueryGrouping', function () {
 
     test('paginates first page', function () {
         $query = MockQueryBuilder::table('users')
-            ->forPage(1, 10);
+            ->forPage(1, 10)
+        ;
 
         $sql = $query->toSql();
         expect($sql)->toContain('LIMIT 10');
@@ -91,28 +102,32 @@ describe('QueryGrouping', function () {
 
     test('adds latest ordering with default column', function () {
         $query = MockQueryBuilder::table('users')
-            ->latest();
+            ->latest()
+        ;
 
         expect($query->toSql())->toContain('ORDER BY created_at DESC');
     });
 
     test('adds latest ordering with custom column', function () {
         $query = MockQueryBuilder::table('users')
-            ->latest('published_at');
+            ->latest('published_at')
+        ;
 
         expect($query->toSql())->toContain('ORDER BY published_at DESC');
     });
 
     test('adds oldest ordering with default column', function () {
         $query = MockQueryBuilder::table('users')
-            ->oldest();
+            ->oldest()
+        ;
 
         expect($query->toSql())->toContain('ORDER BY created_at ASC');
     });
 
     test('adds oldest ordering with custom column', function () {
         $query = MockQueryBuilder::table('users')
-            ->oldest('updated_at');
+            ->oldest('updated_at')
+        ;
 
         expect($query->toSql())->toContain('ORDER BY updated_at ASC');
     });
@@ -120,7 +135,8 @@ describe('QueryGrouping', function () {
     test('inRandomOrder applies RAND() on MySQL', function () {
         $query = MockQueryBuilder::table('users')
             ->setDriver('mysql')
-            ->inRandomOrder();
+            ->inRandomOrder()
+        ;
 
         expect($query->toSql())->toContain('ORDER BY RAND()');
     });
@@ -128,7 +144,8 @@ describe('QueryGrouping', function () {
     test('inRandomOrder applies RANDOM() on PgSQL', function () {
         $query = MockQueryBuilder::table('users')
             ->setDriver('pgsql')
-            ->inRandomOrder();
+            ->inRandomOrder()
+        ;
 
         expect($query->toSql())->toContain('ORDER BY RANDOM()');
     });
@@ -137,7 +154,8 @@ describe('QueryGrouping', function () {
         $query = MockQueryBuilder::table('users')
             ->orderBy('name')
             ->orderBy('created_at', 'DESC')
-            ->reorder();
+            ->reorder()
+        ;
 
         expect($query->toSql())->not->toContain('ORDER BY');
     });
@@ -145,7 +163,8 @@ describe('QueryGrouping', function () {
     test('reorder clears and sets a new ordering', function () {
         $query = MockQueryBuilder::table('users')
             ->orderBy('name')
-            ->reorder('created_at', 'DESC');
+            ->reorder('created_at', 'DESC')
+        ;
 
         expect($query->toSql())->toBe('SELECT * FROM users ORDER BY created_at DESC');
     });
@@ -153,7 +172,8 @@ describe('QueryGrouping', function () {
     test('orderByRaw compiles raw sorting with bindings', function () {
         $query = MockQueryBuilder::table('users')
             ->where('status', 'active')
-            ->orderByRaw('FIELD(role, ?, ?)', ['admin', 'moderator']);
+            ->orderByRaw('FIELD(role, ?, ?)', ['admin', 'moderator'])
+        ;
 
         expect($query->toSql())->toBe('SELECT * FROM users WHERE status = ? ORDER BY FIELD(role, ?, ?)');
         expect($query->getBindings())->toBe(['active', 'admin', 'moderator']);
@@ -164,7 +184,8 @@ describe('QueryGrouping', function () {
             ->select('status, COUNT(*) as total')
             ->where('amount', '>', 100)
             ->groupByRaw('YEAR(created_at) + ?', [1])
-            ->havingRaw('COUNT(*) > ?', [5]);
+            ->havingRaw('COUNT(*) > ?', [5])
+        ;
 
         expect($query->toSql())->toBe('SELECT status, COUNT(*) as total FROM orders WHERE amount > ? GROUP BY YEAR(created_at) + ? HAVING COUNT(*) > ?');
         expect($query->getBindings())->toBe([100, 1, 5]);

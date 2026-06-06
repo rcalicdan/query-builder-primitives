@@ -15,6 +15,7 @@ trait QueryBuilderCore
      * @var array<string> The columns to select in the query.
      */
     protected array $select = ['*'];
+
     /**
      * @var array<string, array<mixed>> The parameter bindings for the query, grouped by type.
      */
@@ -220,10 +221,10 @@ trait QueryBuilderCore
             return [
                 ...$this->bindings['select'],
                 ...$whereBindings,
-                ...$this->bindings['groupBy'], 
+                ...$this->bindings['groupBy'],
                 ...$this->bindings['having'],
                 ...$this->bindings['union'],
-                ...$this->bindings['orderBy'], 
+                ...$this->bindings['orderBy'],
             ];
         }
 
@@ -240,10 +241,10 @@ trait QueryBuilderCore
         return [
             ...$this->bindings['select'],
             ...$whereBindings,
-            ...$this->bindings['groupBy'],     
+            ...$this->bindings['groupBy'],
             ...$this->bindings['having'],
             ...$this->bindings['union'],
-            ...$this->bindings['orderBy'],     
+            ...$this->bindings['orderBy'],
         ];
     }
 }

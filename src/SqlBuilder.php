@@ -557,7 +557,7 @@ trait SqlBuilder
             throw new \InvalidArgumentException('Data cannot be empty for insert ignore');
         }
 
-        $isBatch = \is_array(reset($data)) && \is_array(reset($data));
+        $isBatch = \is_array(reset($data));
 
         /** @var array<string, mixed>|array<array<string, mixed>> $data */
         $driver = $this->getDriver();
@@ -575,12 +575,14 @@ trait SqlBuilder
      */
     private function buildMySqlInsertIgnore(array $data, bool $isBatch): string
     {
+        /** @var array<string, mixed> $firstRow */
         $firstRow = $isBatch ? $data[0] : $data;
         $columns = implode(', ', array_keys($firstRow));
 
         if ($isBatch) {
             $rowPlaceholders = [];
             foreach ($data as $row) {
+                /** @var array<string, mixed> $row */
                 $rowPlaceholders[] = '(' . implode(', ', array_fill(0, \count($row), '?')) . ')';
             }
             $allPlaceholders = implode(', ', $rowPlaceholders);
@@ -596,12 +598,14 @@ trait SqlBuilder
      */
     private function buildPostgreSqlInsertIgnore(array $data, bool $isBatch): string
     {
+        /** @var array<string, mixed> $firstRow */
         $firstRow = $isBatch ? $data[0] : $data;
         $columns = implode(', ', array_keys($firstRow));
 
         if ($isBatch) {
             $rowPlaceholders = [];
             foreach ($data as $row) {
+                /** @var array<string, mixed> $row */
                 $rowPlaceholders[] = '(' . implode(', ', array_fill(0, \count($row), '?')) . ')';
             }
             $allPlaceholders = implode(', ', $rowPlaceholders);
@@ -617,12 +621,14 @@ trait SqlBuilder
      */
     private function buildSqliteInsertIgnore(array $data, bool $isBatch): string
     {
+        /** @var array<string, mixed> $firstRow */
         $firstRow = $isBatch ? $data[0] : $data;
         $columns = implode(', ', array_keys($firstRow));
 
         if ($isBatch) {
             $rowPlaceholders = [];
             foreach ($data as $row) {
+                /** @var array<string, mixed> $row */
                 $rowPlaceholders[] = '(' . implode(', ', array_fill(0, \count($row), '?')) . ')';
             }
             $allPlaceholders = implode(', ', $rowPlaceholders);
