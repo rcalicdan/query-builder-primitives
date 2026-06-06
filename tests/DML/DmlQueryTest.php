@@ -170,4 +170,27 @@ describe('DML Query Tests', function () {
             ;
         });
     });
+
+    describe('Increment / Decrement', function () {
+        test('builds increment query without extra columns', function () {
+            $builder = MockQueryBuilder::table('users')->where('id', 1);
+            $sql = $builder->buildIncrementQuery('score', 5);
+
+            expect($sql)->toBe('UPDATE users SET score = score + 5 WHERE id = ?');
+        });
+
+        test('builds increment query with float amount and extra columns', function () {
+            $builder = MockQueryBuilder::table('wallets')->where('user_id', 42);
+            $sql = $builder->buildIncrementQuery('balance', 10.50, ['updated_at' => '2024-01-01']);
+
+            expect($sql)->toBe('UPDATE wallets SET balance = balance + 10.5, updated_at = ? WHERE user_id = ?');
+        });
+
+        test('builds decrement query without extra columns', function () {
+            $builder = MockQueryBuilder::table('inventory')->where('product_id', 10);
+            $sql = $builder->buildDecrementQuery('stock', 1);
+
+            expect($sql)->toBe('UPDATE inventory SET stock = stock - 1 WHERE product_id = ?');
+        });
+    });
 });

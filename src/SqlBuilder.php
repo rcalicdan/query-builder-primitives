@@ -486,4 +486,58 @@ trait SqlBuilder
 
         return 'SELECT EXISTS(' . $innerQuery->buildSelectQuery() . ')';
     }
+
+    /**
+     * Build the INCREMENT SQL query string.
+     *
+     * @param string $column The column to increment.
+     * @param int|float $amount The amount to increment by.
+     * @param array<string, mixed> $extra Extra columns to update simultaneously.
+     *
+     * @return string The complete UPDATE SQL query.
+     */
+    protected function buildIncrementQuery(string $column, int|float $amount = 1, array $extra = []): string
+    {
+        $setClauses = ["{$column} = {$column} + {$amount}"];
+
+        foreach (array_keys($extra) as $extraColumn) {
+            $setClauses[] = "{$extraColumn} = ?";
+        }
+
+        $sql = "UPDATE {$this->table} SET " . implode(', ', $setClauses);
+
+        $whereSql = $this->buildWhereClause();
+        if ($whereSql !== '') {
+            $sql .= ' WHERE ' . $whereSql;
+        }
+
+        return $sql;
+    }
+
+    /**
+     * Build the DECREMENT SQL query string.
+     *
+     * @param string $column The column to decrement.
+     * @param int|float $amount The amount to decrement by.
+     * @param array<string, mixed> $extra Extra columns to update simultaneously.
+     *
+     * @return string The complete UPDATE SQL query.
+     */
+    protected function buildDecrementQuery(string $column, int|float $amount = 1, array $extra = []): string
+    {
+        $setClauses = ["{$column} = {$column} - {$amount}"];
+
+        foreach (array_keys($extra) as $extraColumn) {
+            $setClauses[] = "{$extraColumn} = ?";
+        }
+
+        $sql = "UPDATE {$this->table} SET " . implode(', ', $setClauses);
+
+        $whereSql = $this->buildWhereClause();
+        if ($whereSql !== '') {
+            $sql .= ' WHERE ' . $whereSql;
+        }
+
+        return $sql;
+    }
 }

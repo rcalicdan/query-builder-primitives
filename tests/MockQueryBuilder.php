@@ -34,6 +34,8 @@ class MockQueryBuilder
         buildExistsQuery as protected traitBuildExistsQuery;
         buildDeleteQuery as protected traitBuildDeleteQuery;
         buildUpsertQuery as protected traitBuildUpsertQuery;
+        buildIncrementQuery as protected traitBuildIncrementQuery;
+        buildDecrementQuery as protected traitBuildDecrementQuery;
     }
 
     public function __construct(?string $table = null)
@@ -105,5 +107,15 @@ class MockQueryBuilder
     public function buildUpsertQuery(array $data, string|array $uniqueColumns, ?array $updateColumns = null): string
     {
         return $this->traitBuildUpsertQuery($data, $uniqueColumns, $updateColumns);
+    }
+
+    public function buildIncrementQuery(string $column, int|float $amount = 1, array $extra = []): string
+    {
+        return $this->traitBuildIncrementQuery($column, $amount, $extra);
+    }
+
+    public function buildDecrementQuery(string $column, int|float $amount = 1, array $extra = []): string
+    {
+        return $this->traitBuildDecrementQuery($column, $amount, $extra);
     }
 }
