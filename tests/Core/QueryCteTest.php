@@ -65,6 +65,28 @@ describe('QueryCte Primitives - Core Features', function () {
         expect($query->toSql())->toContain('WITH RECURSIVE org_chart AS');
     });
 
+    test('compiles recursive CTE using withRecursive() alias', function () {
+        $query = MockQueryBuilder::table('org_chart')
+            ->withRecursive('org_chart', function ($q) {
+                return $q->from('employees')
+                    ->select('id', 'name', 'manager_id')
+                    ->where('id', 1)
+                    ->unionAll(function ($union) {
+                        return $union->from('employees as e')
+                            ->select('e.id', 'e.name', 'e.manager_id')
+                            ->join('org_chart as o', 'e.manager_id = o.id')
+                        ;
+                    })
+                ;
+            })
+        ;
+
+        expect($query->toSql())->toBe(
+            'WITH RECURSIVE org_chart AS (SELECT id, name, manager_id FROM employees WHERE id = ? UNION ALL SELECT e.id, e.name, e.manager_id FROM employees as e INNER JOIN org_chart as o ON e.manager_id = o.id) SELECT * FROM org_chart'
+        );
+        expect($query->getBindings())->toBe([1]);
+    });
+
     test('compiles count queries executing on top of CTE structures', function () {
         $query = MockQueryBuilder::table('filtered_users')
             ->with('filtered_users', function ($q) {
@@ -196,7 +218,8 @@ describe('QueryCte Primitives - Advanced & Edge Cases', function () {
             ->with('large_cte', function ($q) {
                 return $q->from('logs')->where('severity', 'error');
             })
-            ->limit(50, 100);
+            ->limit(50, 100)
+        ;
 
         expect($query->toSql())->toBe(
             'WITH large_cte AS (SELECT * FROM logs WHERE severity = ?) SELECT * FROM large_cte LIMIT 50 OFFSET 100'
