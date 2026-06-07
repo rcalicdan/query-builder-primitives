@@ -15,7 +15,10 @@ trait SqlBuilder
     {
         $sql = $this->buildCteClause();
         $sql .= 'SELECT ' . implode(', ', $this->select);
-        $sql .= ' FROM ' . $this->table;
+
+        if ($this->table !== '') {
+            $sql .= ' FROM ' . $this->table;
+        }
 
         foreach ($this->joins as $join) {
             if ($join['type'] === 'CROSS') {
@@ -130,7 +133,11 @@ trait SqlBuilder
     protected function buildCountQuery(string $column = '*'): string
     {
         $sql = $this->buildCteClause();
-        $sql .= "SELECT COUNT({$column}) FROM " . $this->table;
+        $sql .= "SELECT COUNT({$column})";
+
+        if ($this->table !== '') {
+            $sql .= " FROM " . $this->table;
+        }
 
         foreach ($this->joins as $join) {
             if ($join['type'] === 'CROSS') {
@@ -469,8 +476,11 @@ trait SqlBuilder
     protected function buildAggregateQuery(string $function, string $column): string
     {
         $sql = $this->buildCteClause();
+        $sql .= "SELECT {$function}({$column})";
 
-        $sql .= "SELECT {$function}({$column}) FROM {$this->table}";
+        if ($this->table !== '') {
+            $sql .= " FROM {$this->table}";
+        }
 
         foreach ($this->joins as $join) {
             if ($join['type'] === 'CROSS') {
