@@ -24,6 +24,8 @@ A collection of PHP traits for building immutable, fluent query builders. This l
   - [QueryGrouping](#querygrouping)
   - [QueryLocking](#querylocking)
   - [QueryUnion](#queryunion)
+  - [QueryCte](#querycte)
+  - [QueryJson](#queryjson)
   - [QueryDebug](#querydebug)
   - [SqlBuilder](#sqlbuilder)
     - [buildExistsQuery()](#buildexistsquery)
@@ -45,6 +47,8 @@ A collection of PHP traits for building immutable, fluent query builders. This l
   - [Existence Checks](#existence-checks)
   - [Atomic Counters](#atomic-counters)
   - [Insert Ignore](#insert-ignore)
+  - [CTE Patterns](#cte-patterns)
+  - [JSON Patterns](#json-patterns)
   - [Pessimistic Locking Patterns](#pessimistic-locking-patterns)
   - [UNION Patterns](#union-patterns)
   - [Reporting Queries](#reporting-queries)
@@ -86,13 +90,13 @@ $admins = $base->where('role', 'admin');
 // Safe concurrent use — each fiber/coroutine gets its own query state:
 $base = $qb->from('orders')->where('status', 'pending');
 
-$fiber1 = async(function() use ($base) {
+$fiber1 = new Fiber(function() use ($base) {
     // Branches off $base into a new instance — completely isolated
     $query = $base->where('user_id', 1)->latest();
     // ... execute $query
 });
 
-$fiber2 = async(function() use ($base) {
+$fiber2 = new Fiber(function() use ($base) {
     // Also branches off $base — no interference with fiber1
     $query = $base->where('user_id', 2)->oldest();
     // ... execute $query
@@ -118,17 +122,19 @@ The trade-off is that you must always assign or chain the return value — disca
 ```
 QueryBuilderCore (foundation - required)
   ↓
-SqlBuilder (depends on: properties from condition/join/grouping traits)
+SqlBuilder (depends on: properties from condition/join/grouping/cte traits)
   ↓
 QueryConditions (depends on: QueryBuilderCore)
   ↓
 QueryAdvancedConditions (depends on: QueryConditions, SqlBuilder)
 
 QueryConditionable (depends on: QueryBuilderCore)
-QueryJoin (depends on: QueryBuilderCore)
+QueryJoin (depends on: QueryBuilderCore, JoinClause)
 QueryGrouping (depends on: QueryBuilderCore)
 QueryLocking (depends on: QueryBuilderCore, SqlBuilder)
 QueryUnion (depends on: QueryBuilderCore, SqlBuilder)
+QueryCte (depends on: QueryBuilderCore, SqlBuilder)
+QueryJson (depends on: QueryBuilderCore, QueryConditions)
 QueryDebug (depends on: all traits)
 ```
 
@@ -137,14 +143,16 @@ QueryDebug (depends on: all traits)
 | Trait | Purpose | Dependencies |
 | :--- | :--- | :--- |
 | `QueryBuilderCore` | Core properties, select, and `from()` | None (foundation) |
-| `SqlBuilder` | Builds SQL query strings | QueryBuilderCore + condition/join/grouping traits |
+| `SqlBuilder` | Builds SQL query strings | QueryBuilderCore + condition/join/grouping/cte traits |
 | `QueryConditions` | Basic WHERE, HAVING, LIKE clauses | QueryBuilderCore |
 | `QueryAdvancedConditions` | Nested conditions, EXISTS, subqueries | QueryConditions, SqlBuilder |
 | `QueryConditionable` | Conditional `when()` / `unless()` helpers | QueryBuilderCore |
-| `QueryJoin` | JOIN operations (INNER, LEFT, RIGHT, CROSS) | QueryBuilderCore |
+| `QueryJoin` | JOIN operations (INNER, LEFT, RIGHT, CROSS) with simple string or advanced closure conditions | QueryBuilderCore, JoinClause |
 | `QueryGrouping` | GROUP BY, ORDER BY, LIMIT, OFFSET, random order, reorder | QueryBuilderCore |
 | `QueryLocking` | Pessimistic locking (FOR UPDATE, FOR SHARE, NOWAIT, SKIP LOCKED) | QueryBuilderCore, SqlBuilder |
 | `QueryUnion` | UNION and UNION ALL operations | QueryBuilderCore, SqlBuilder |
+| `QueryCte` | Common Table Expressions (WITH / WITH RECURSIVE) | QueryBuilderCore, SqlBuilder |
+| `QueryJson` | JSON path conditions, contains, length, driver-aware compilation | QueryBuilderCore, QueryConditions |
 | `QueryDebug` | Debug utilities (toSql, dump, dd) | All traits |
 
 ### Interfaces
@@ -157,10 +165,13 @@ Each trait has a corresponding contract under `Rcalicdan\QueryBuilderPrimitives\
 | `ConditionInterface` | All WHERE, HAVING, LIKE methods |
 | `AdvancedConditionInterface` | `whereGroup`, `whereExists`, `whereSub`, etc. |
 | `ConditionalInterface` | `when`, `unless` |
-| `JoinInterface` | All JOIN methods |
-| `GroupingInterface` | `groupBy`, `orderBy`, `latest`, `oldest`, `limit`, `offset`, `forPage`, `inRandomOrder`, `reorder` |
+| `JoinInterface` | All JOIN methods (string and closure conditions) |
+| `JoinClauseInterface` | `on`, `orOn` for advanced closure-based joins |
+| `GroupingInterface` | `groupBy`, `groupByRaw`, `orderBy`, `orderByRaw`, `latest`, `oldest`, `limit`, `offset`, `forPage`, `inRandomOrder`, `reorder` |
 | `LockingInterface` | All locking methods |
 | `UnionInterface` | `union`, `unionAll` |
+| `CteInterface` | `with` |
+| `JsonConditionInterface` | `whereJson`, `whereJsonContains`, `whereJsonLength`, `whereJsonDoesntContain`, and OR variants |
 | `DebugInterface` | `toSql`, `getBindings`, `toRawSql`, `dump`, `dd` |
 | `QueryBuilderPrimitiveInterface` | Extends all of the above |
 
@@ -245,7 +256,7 @@ Foundation trait providing core properties and select/driver management.
 **Properties:**
 *   `$table` - Table name
 *   `$select` - Select columns
-*   `$bindings` - Parameter bindings array
+*   `$bindings` - Parameter bindings array (keyed by type: `cte`, `select`, `join`, `where`, `groupBy`, `having`, `orderBy`, `union`, etc.)
 
 **Public Methods:**
 ```php
@@ -292,9 +303,9 @@ $qb->from('users')->selectDistinct('country');
 
 #### The `newQuery()` Method — Required Override for Custom Constructors
 
-`newQuery()` is the internal factory used by `QueryAdvancedConditions` and `QueryUnion` whenever they need a fresh builder instance for subqueries or unions. The default implementation calls `new static()` with no arguments.
+`newQuery()` is the internal factory used by `QueryAdvancedConditions`, `QueryUnion`, `QueryCte`, and `QueryJoin` whenever they need a fresh builder instance. The default implementation calls `new static()` with no arguments.
 
-**If your concrete class has required constructor parameters** (e.g., a PDO connection, a service container, or a config object), you **must** override `newQuery()` to pass those dependencies. Without this, subquery methods (`whereExists`, `whereGroup`, `whereSub`, `union`, etc.) will throw a `\LogicException` at runtime.
+**If your concrete class has required constructor parameters** (e.g., a PDO connection, a service container, or a config object), you **must** override `newQuery()` to pass those dependencies. Without this, subquery methods (`whereExists`, `whereGroup`, `whereSub`, `union`, `with`, etc.) will throw a `\LogicException` at runtime.
 
 ```php
 class ExecutableQueryBuilder extends QueryBuilderBase
@@ -488,40 +499,23 @@ unless(mixed $value, callable $callback, ?callable $default = null): static
 
 The `$value` parameter accepts:
 - **Scalars** — strings, integers, booleans, `null`, etc. Evaluated directly as truthy/falsy.
-- **Invokable objects** — any object implementing `__invoke`. Called with the builder as argument; its return value becomes the condition.
+- **Invokable objects** — any object implementing `__invoke` (including Closures). Called with the builder as argument; its return value becomes the condition.
 - **Not supported as conditions** — string callables (`'MyClass::method'`) and array callables (`[$obj, 'method']`) are treated as plain values, not resolved as callables.
-
-The `$callback` and `$default` parameters are standard PHP callables and always receive `($builder, $resolvedValue)` as arguments.
 
 **Examples:**
 ```php
-// Scalar value — truthy/falsy evaluated directly
-$status = 'active';
-
+// Scalar value — applied when truthy
 $qb->from('users')
-    ->when($status, function($query, $value) {
-        return $query->where('status', $value);
-    });
-// WHERE status = ?  (applied because $status is truthy)
-
-// Null / falsy — condition skipped
-$qb->from('users')
-    ->when(null, function($query, $value) {
-        return $query->where('status', $value); // never runs
-    });
+    ->when($status, fn($q, $v) => $q->where('status', $v));
 
 // With a default branch (runs when value is falsy)
-$role = null;
-
 $qb->from('users')
-    ->when($role, function($query, $value) {
-        return $query->where('role', $value);
-    }, function($query, $value) {
-        return $query->where('role', 'guest');
-    });
-// WHERE role = 'guest'  (default branch ran)
+    ->when($role,
+        fn($q, $v) => $q->where('role', $v),
+        fn($q, $v) => $q->where('role', 'guest')
+    );
 
-// Invokable class as $value — resolved by calling __invoke($builder)
+// Invokable class as $value
 class HasActiveSubscription
 {
     public function __invoke(mixed $builder): bool
@@ -531,87 +525,77 @@ class HasActiveSubscription
 }
 
 $qb->from('features')
-    ->when(new HasActiveSubscription(), function($query, $value) {
-        return $query->where('tier', 'premium');
-    });
-// WHERE tier = ?  (only if HasActiveSubscription returned true)
+    ->when(new HasActiveSubscription(), fn($q, $v) => $q->where('tier', 'premium'));
 
-// Closure as $value — also an invokable object, resolved the same way
+// Closure as $value (also an invokable object)
 $qb->from('orders')
-    ->when(
-        fn($query) => auth()->user()->isAdmin(),
-        fn($query, $value) => $query->where('user_id', auth()->id())
-    );
+    ->when(fn($q) => auth()->user()->isAdmin(), fn($q, $v) => $q->where('user_id', auth()->id()));
 
-// String and array callables are NOT resolved — treated as plain values
-// Both of these will always apply the callback (non-empty string/array is truthy)
-$qb->from('users')
-    ->when('SomeClass::method', fn($q, $v) => $q->where('flag', true));  // always runs
-$qb->from('users')
-    ->when([$obj, 'method'],   fn($q, $v) => $q->where('flag', true));  // always runs
-
-// unless() — mirror of when(), applies callback when value is falsy
-$isAdmin = false;
-
+// unless() — applies callback when value is falsy
 $qb->from('posts')
-    ->unless($isAdmin, function($query, $value) {
-        return $query->where('published', true);
-    });
-// WHERE published = ?  (applied because $isAdmin is falsy)
+    ->unless($isAdmin, fn($q, $v) => $q->where('published', true));
 
-// Invokable class with unless()
-class IsGuestUser
-{
-    public function __invoke(mixed $builder): bool
-    {
-        return auth()->guest();
-    }
-}
-
-$qb->from('posts')
-    ->unless(new IsGuestUser(), function($query, $value) {
-        return $query->where('draft', false);
-    });
-// WHERE draft = ?  (only if user is NOT a guest)
-
-// Chaining multiple conditionals cleanly
-$search    = 'john';
-$sortField = 'created_at';
-$isAdmin   = false;
-
+// Chaining multiple conditionals
 $qb->from('users')
     ->when($search,    fn($q, $v) => $q->like('name', $v))
     ->when($sortField, fn($q, $v) => $q->orderBy($v, 'DESC'))
     ->unless($isAdmin, fn($q, $v) => $q->where('active', true));
-// WHERE name LIKE ? AND active = ? ORDER BY created_at DESC
 ```
 
 ---
 
 ### QueryJoin
 
-JOIN operations.
+JOIN operations. The condition argument accepts either a plain string (simple `ON` expression) or a closure that receives a `JoinClause` for building multi-condition, mixed column-and-value joins.
 
-**Dependencies:** Requires `QueryBuilderCore`
+**Dependencies:** Requires `QueryBuilderCore`, `JoinClause`
 
 **Methods:**
 ```php
-join(string $table, string $condition, string $type = 'INNER'): static
-leftJoin(string $table, string $condition): static
-rightJoin(string $table, string $condition): static
-innerJoin(string $table, string $condition): static
+join(string $table, string|callable $condition, string $type = 'INNER'): static
+leftJoin(string $table, string|callable $condition): static
+rightJoin(string $table, string|callable $condition): static
+innerJoin(string $table, string|callable $condition): static
 crossJoin(string $table): static
+```
+
+**`JoinClause` methods (available inside the closure):**
+```php
+on(string $first, ?string $operator, ?string $second, string $boolean = 'AND'): static
+orOn(string $first, ?string $operator, ?string $second): static
+// All QueryConditions methods are also available (where, orWhere, whereNull, etc.)
 ```
 
 **Examples:**
 ```php
-// INNER JOIN
+// Simple string condition
 $qb->from('users')
     ->innerJoin('profiles', 'profiles.user_id = users.id');
 
-// LEFT JOIN
+// Advanced closure — multi-condition join
 $qb->from('users')
-    ->leftJoin('orders', 'orders.user_id = users.id');
+    ->leftJoin('orders', function($join) {
+        return $join
+            ->on('orders.user_id', '=', 'users.id')
+            ->on('orders.status', '=', 'users.preferred_status');
+    });
+
+// Mixed column comparison and value filter in a single join
+$qb->from('users')
+    ->leftJoin('orders', function($join) {
+        return $join
+            ->on('orders.user_id', '=', 'users.id')
+            ->where('orders.status', 'completed')
+            ->whereNull('orders.deleted_at');
+    });
+
+// OR ON condition
+$qb->from('contacts')
+    ->leftJoin('users', function($join) {
+        return $join
+            ->on('users.email', '=', 'contacts.primary_email')
+            ->orOn('users.email', '=', 'contacts.secondary_email');
+    });
 
 // Multiple joins
 $qb->from('users')
@@ -620,8 +604,7 @@ $qb->from('users')
     ->leftJoin('payments', 'payments.order_id = orders.id');
 
 // CROSS JOIN
-$qb->from('colors')
-    ->crossJoin('sizes');
+$qb->from('colors')->crossJoin('sizes');
 ```
 
 ---
@@ -649,88 +632,52 @@ offset(int $offset): static
 forPage(int $page, int $perPage = 15): static
 ```
 
-Also update the `GroupingInterface` row in the Interfaces table:
-
-| Interface | Covers |
-| :--- | :--- |
-| `GroupingInterface` | `groupBy`, `groupByRaw`, `orderBy`, `orderByRaw`, `latest`, `oldest`, `limit`, `offset`, `forPage`, `inRandomOrder`, `reorder` |
-
 **Examples:**
-
 ```php
 // Standard GROUP BY
-$qb->select('status')
-    ->selectRaw('COUNT(*) as total')
-    ->groupBy('status');
-
-// Multiple columns — string (comma-separated) or array
-$qb->groupBy('user_id, status');
+$qb->groupBy('status');
 $qb->groupBy(['user_id', 'status']);
+$qb->groupBy('user_id, status');   // comma-separated string also works
 
 // Raw GROUP BY — for expressions, ROLLUP, CUBE, etc.
-$qb->from('orders')
-    ->select('user_id')
-    ->selectRaw('SUM(total) as total_spent')
-    ->groupByRaw('ROLLUP(user_id)');
-
-// Raw GROUP BY with bindings
-$qb->from('events')
-    ->groupByRaw('DATE_FORMAT(created_at, ?)', ['%Y-%m']);
-// GROUP BY DATE_FORMAT(created_at, ?)
+$qb->from('orders')->groupByRaw('ROLLUP(user_id)');
+$qb->from('events')->groupByRaw('DATE_FORMAT(created_at, ?)', ['%Y-%m']);
 
 // Standard ORDER BY
-$qb->orderBy('created_at', 'DESC')
-    ->orderBy('name', 'ASC');
-
-// Shorthand direction methods
+$qb->orderBy('created_at', 'DESC')->orderBy('name', 'ASC');
 $qb->orderByDesc('created_at');
 $qb->orderByAsc('name');
 
 // Raw ORDER BY — for expressions, FIELD(), CASE WHEN, etc.
-$qb->from('orders')
-    ->orderByRaw('FIELD(status, ?, ?, ?)', ['pending', 'active', 'closed']);
-// ORDER BY FIELD(status, ?, ?, ?)
+$qb->from('orders')->orderByRaw('FIELD(status, ?, ?, ?)', ['pending', 'active', 'closed']);
+$qb->from('products')->orderByRaw('CASE WHEN featured = 1 THEN 0 ELSE 1 END, name ASC');
 
-$qb->from('products')
-    ->orderByRaw('CASE WHEN featured = 1 THEN 0 ELSE 1 END, name ASC');
-// ORDER BY CASE WHEN featured = 1 THEN 0 ELSE 1 END, name ASC
-
-// Chaining standard and raw ORDER BY together
+// Chaining standard and raw ORDER BY
 $qb->from('products')
     ->orderByRaw('FIELD(status, ?, ?)', ['featured', 'active'])
     ->orderByAsc('name');
-// ORDER BY FIELD(status, ?, ?), name ASC
 
 // latest() / oldest() — semantic aliases defaulting to 'created_at'
-$qb->from('posts')->latest();
-// ORDER BY created_at DESC
+$qb->from('posts')->latest();               // ORDER BY created_at DESC
+$qb->from('posts')->oldest();               // ORDER BY created_at ASC
+$qb->from('posts')->latest('published_at'); // ORDER BY published_at DESC
 
-$qb->from('posts')->oldest();
-// ORDER BY created_at ASC
-
-$qb->from('posts')->latest('published_at');
-// ORDER BY published_at DESC
-
-// Random order — syntax adapts per driver automatically
+// Random order — adapts per driver
 $qb->from('products')->inRandomOrder();
 // MySQL:          ORDER BY RAND()
 // PgSQL / SQLite: ORDER BY RANDOM()
 
-// reorder() — wipe existing ORDER BY and optionally set a fresh one
+// reorder() — clear existing ORDER BY and optionally replace
 $base    = $qb->from('users')->orderByDesc('created_at');
-$fresh   = $base->reorder();                   // clears all ORDER BY
-$renewed = $base->reorder('name', 'ASC');      // clears then sets ORDER BY name ASC
+$fresh   = $base->reorder();                    // clears all ORDER BY
+$renewed = $base->reorder('name', 'ASC');       // clears then sets ORDER BY name ASC
+$base->reorder()->orderByRaw('RAND()');         // clear then raw
 
-// reorder() + orderByRaw — clear and replace with a raw expression
-$base->reorder()->orderByRaw('RAND()');
-
-// LIMIT and OFFSET
+// LIMIT / OFFSET / pagination
 $qb->limit(10)->offset(20);
-$qb->limit(10, 20);    // combined shorthand — LIMIT 10 OFFSET 20
-
-// Pagination helper
-$qb->forPage(2, 25);   // page 2, 25 per page = LIMIT 25 OFFSET 25
-$qb->forPage(1);       // page 1, default 15 per page = LIMIT 15 OFFSET 0
+$qb->limit(10, 20);        // combined — LIMIT 10 OFFSET 20
+$qb->forPage(2, 25);       // page 2, 25 per page = LIMIT 25 OFFSET 25
+$qb->forPage(1);           // page 1, default 15 per page
 ```
 
 ---
@@ -770,48 +717,26 @@ withoutLock(): static
 **Examples:**
 ```php
 // Exclusive lock
-$qb->from('orders')
-    ->where('id', 1)
-    ->lockForUpdate()
-    ->toSql();
+$qb->from('orders')->where('id', 1)->lockForUpdate()->toSql();
 // MySQL/PgSQL: SELECT * FROM orders WHERE id = ? FOR UPDATE
 
 // Shared lock
-$qb->from('inventory')
-    ->where('product_id', 42)
-    ->lockForShare()
-    ->toSql();
-// MySQL: SELECT * FROM inventory WHERE product_id = ? LOCK IN SHARE MODE
-// PgSQL: SELECT * FROM inventory WHERE product_id = ? FOR SHARE
+$qb->from('inventory')->where('product_id', 42)->lockForShare()->toSql();
+// MySQL: ... LOCK IN SHARE MODE   PgSQL: ... FOR SHARE
 
-// Fail immediately if rows are locked
-$qb->from('orders')
-    ->where('status', 'pending')
-    ->lockForUpdate()
-    ->noWait()
-    ->toSql();
-// SELECT * FROM orders WHERE status = ? FOR UPDATE NOWAIT
+// Fail immediately if locked
+$qb->from('orders')->where('status', 'pending')->lockForUpdate()->noWait()->toSql();
+// ... FOR UPDATE NOWAIT
 
-// Queue worker pattern — skip rows locked by other workers
-$qb->from('jobs')
-    ->where('status', 'pending')
-    ->orderBy('created_at')
-    ->limit(1)
-    ->lockForUpdate()
-    ->skipLocked()
-    ->toSql();
-// SELECT * FROM jobs WHERE status = ? ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED
+// Skip locked rows (queue worker pattern)
+$qb->from('jobs')->where('status', 'pending')->oldest()->limit(1)->lockForUpdate()->skipLocked()->toSql();
+// ... FOR UPDATE SKIP LOCKED
 
 // PostgreSQL OF clause
-$qb->from('orders')
-    ->setDriver('pgsql')
-    ->join('users', 'orders.user_id = users.id')
-    ->lockForUpdate()
-    ->lockOf('orders')
-    ->toSql();
-// SELECT * FROM orders INNER JOIN users ON orders.user_id = users.id FOR UPDATE OF orders
+$qb->from('orders')->setDriver('pgsql')->join('users', 'orders.user_id = users.id')->lockForUpdate()->lockOf('orders')->toSql();
+// ... FOR UPDATE OF orders
 
-// Remove lock from a reused base query
+// Remove lock
 $base     = $qb->from('orders')->lockForUpdate();
 $unlocked = $base->withoutLock();
 ```
@@ -844,59 +769,194 @@ unionAll(callable $callback): static
 $qb->from('active_users')
     ->select('id', 'name', 'email')
     ->union(function($query) {
-        return $query
-            ->from('archived_users')
-            ->select('id', 'name', 'email');
-    })
-    ->toSql();
-// SELECT id, name, email FROM active_users
-// UNION SELECT id, name, email FROM archived_users
+        return $query->from('archived_users')->select('id', 'name', 'email');
+    });
 
 // UNION ALL (keeps duplicates)
 $qb->from('orders_2023')
     ->select('id', 'total', 'created_at')
     ->unionAll(function($query) {
-        return $query
-            ->from('orders_2024')
-            ->select('id', 'total', 'created_at');
+        return $query->from('orders_2024')->select('id', 'total', 'created_at');
     })
-    ->latest('created_at')
-    ->toSql();
-// SELECT id, total, created_at FROM orders_2023
-// UNION ALL SELECT id, total, created_at FROM orders_2024
-// ORDER BY created_at DESC
+    ->latest('created_at');
 
 // Chaining multiple UNIONs
-$qb->from('employees')
-    ->select('id', 'name', 'department')
-    ->where('active', true)
-    ->union(function($query) {
-        return $query->from('contractors')
-                     ->select('id', 'name', 'department')
-                     ->where('active', true);
-    })
-    ->union(function($query) {
-        return $query->from('interns')
-                     ->select('id', 'name', 'department');
-    })
+$qb->from('employees')->select('id', 'name', 'department')->where('active', true)
+    ->union(fn($q) => $q->from('contractors')->select('id', 'name', 'department')->where('active', true))
+    ->union(fn($q) => $q->from('interns')->select('id', 'name', 'department'))
     ->orderBy('name');
-
-// Bindings are correctly propagated across all union branches
-$qb->from('products')
-    ->select('id', 'name', 'price')
-    ->where('category', 'electronics')
-    ->unionAll(function($query) {
-        return $query->from('products')
-                     ->select('id', 'name', 'price')
-                     ->where('category', 'accessories')
-                     ->where('price', '<', 50);
-    });
-
-$bindings = $qb->getBindings();
-// ['electronics', 'accessories', 50]
 ```
 
 > `ORDER BY`, `LIMIT`, and `OFFSET` placed on the outer query apply to the full union result set. Column counts and types must match across all unioned queries.
+
+---
+
+### QueryCte
+
+Common Table Expressions (CTEs) — `WITH` and `WITH RECURSIVE` clauses. CTEs let you define named temporary result sets that can be referenced in the main query, improving readability and enabling recursive queries such as tree traversal.
+
+**Dependencies:** Requires `QueryBuilderCore` and `SqlBuilder`
+
+> **Note:** This trait uses `newQuery()` internally. If your builder has constructor arguments, override `newQuery()` — see the [QueryBuilderCore](#querybuildercore) section above.
+
+**Methods:**
+```php
+with(string $name, callable $callback, bool $recursive = false): static
+```
+
+The `$callback` receives a fresh `QueryBuilderPrimitiveInterface` instance and must return it after building the CTE's SELECT query. Multiple `with()` calls on the same chain accumulate CTEs in declaration order. If any CTE is marked `$recursive = true`, the entire `WITH` clause is compiled as `WITH RECURSIVE`.
+
+**Examples:**
+```php
+// Simple CTE — pre-filter before the main query
+$qb->from('active_users')
+    ->with('active_users', function($query) {
+        return $query->from('users')->where('status', 'active');
+    })
+    ->select('id', 'name', 'email')
+    ->where('created_at', '>=', '2024-01-01')
+    ->toSql();
+// WITH active_users AS (SELECT * FROM users WHERE status = ?)
+// SELECT id, name, email FROM active_users WHERE created_at >= ?
+
+// Multiple CTEs — each references the previous
+$qb->from('final')
+    ->with('base', fn($q) => $q->from('orders')->where('status', 'completed'))
+    ->with('totals', fn($q) => $q->from('base')->select('user_id')->selectRaw('SUM(total) as spent')->groupBy('user_id'))
+    ->with('final', fn($q) => $q->from('totals')->where('spent', '>', 1000))
+    ->select('user_id', 'spent')
+    ->orderByDesc('spent');
+// WITH base AS (...), totals AS (...), final AS (...)
+// SELECT user_id, spent FROM final ORDER BY spent DESC
+
+// Recursive CTE — tree traversal (e.g. org chart, categories)
+$qb->from('category_tree')
+    ->with('category_tree', function($query) {
+        return $query
+            ->from('categories')
+            ->select('id', 'name', 'parent_id')
+            ->where('parent_id', null)           // anchor: root nodes
+            ->unionAll(function($q) {
+                return $q
+                    ->from('categories')
+                    ->select('categories.id', 'categories.name', 'categories.parent_id')
+                    ->join('category_tree', 'category_tree.id = categories.parent_id'); // recursive join
+            });
+    }, recursive: true)
+    ->select('id', 'name', 'parent_id')
+    ->toSql();
+// WITH RECURSIVE category_tree AS (
+//   SELECT id, name, parent_id FROM categories WHERE parent_id IS NULL
+//   UNION ALL
+//   SELECT categories.id, categories.name, categories.parent_id
+//   FROM categories INNER JOIN category_tree ON category_tree.id = categories.parent_id
+// )
+// SELECT id, name, parent_id FROM category_tree
+
+// CTE bindings are compiled first, before SELECT bindings
+$bindings = $qb->getBindings();
+// CTE bindings appear at the start of the compiled bindings array
+```
+
+---
+
+### QueryJson
+
+Driver-aware JSON column conditions. Supports dot/arrow path notation (`options->preferences->theme`) and compiles to the correct dialect for each database.
+
+**Dependencies:** Requires `QueryBuilderCore` and `QueryConditions`
+
+**Methods:**
+```php
+whereJson(string $column, mixed $operator, mixed $value, string $boolean = 'AND'): static
+orWhereJson(string $column, mixed $operator, mixed $value): static
+whereJsonContains(string $column, mixed $value, string $boolean = 'AND'): static
+orWhereJsonContains(string $column, mixed $value): static
+whereJsonDoesntContain(string $column, mixed $value, string $boolean = 'AND'): static
+orWhereJsonDoesntContain(string $column, mixed $value): static
+whereJsonLength(string $column, string $operator, int $value, string $boolean = 'AND'): static
+orWhereJsonLength(string $column, string $operator, int $value): static
+```
+
+#### Path notation
+
+Use `->` to traverse JSON object keys. Both levels of nesting and flat column references are supported:
+
+```
+'options'                     — the root column
+'options->theme'              — one level deep
+'options->preferences->theme' — nested path
+```
+
+#### Driver compilation matrix
+
+| Method | MySQL | PostgreSQL | SQLite |
+| :--- | :--- | :--- | :--- |
+| `whereJson` | `JSON_UNQUOTE(JSON_EXTRACT(col, '$.path')) op ?` | `col#>>'{path}' op ?` | `json_extract(col, '$.path') op ?` |
+| `whereJsonContains` | `JSON_CONTAINS(col, ?, '$.path')` | `col::jsonb @> ?::jsonb` | `EXISTS (SELECT 1 FROM json_each(...) WHERE value = ?)` |
+| `whereJsonDoesntContain` | `NOT JSON_CONTAINS(...)` | `NOT col::jsonb @> ?::jsonb` | `NOT EXISTS (SELECT 1 FROM json_each(...) ...)` |
+| `whereJsonLength` | `JSON_LENGTH(JSON_EXTRACT(col, '$.path')) op ?` | `jsonb_array_length(col::jsonb) op ?` | `json_array_length(json_extract(col, '$.path')) op ?` |
+
+**Examples:**
+```php
+// Compare a JSON scalar value
+$qb->from('users')
+    ->whereJson('options->theme', '=', 'dark');
+// MySQL:  WHERE JSON_UNQUOTE(JSON_EXTRACT(options, '$.theme')) = ?
+// PgSQL:  WHERE options#>>'{theme}' = ?
+// SQLite: WHERE json_extract(options, '$.theme') = ?
+
+// Two-argument shorthand (defaults to '=')
+$qb->from('users')->whereJson('options->notifications->email', true);
+
+// Nested path
+$qb->from('users')->whereJson('options->preferences->theme', 'dark');
+// MySQL: WHERE JSON_UNQUOTE(JSON_EXTRACT(options, '$.preferences.theme')) = ?
+
+// OR variant
+$qb->from('users')
+    ->whereJson('settings->level', '>', 5)
+    ->orWhereJson('settings->role', 'admin');
+
+// Check if a JSON array contains a value
+$qb->from('users')
+    ->whereJsonContains('options->languages', 'en');
+// MySQL:  WHERE JSON_CONTAINS(options, ?, '$.languages')
+// PgSQL:  WHERE (options->'languages')::jsonb @> ?::jsonb
+// SQLite: WHERE EXISTS (SELECT 1 FROM json_each(json_extract(options, '$.languages')) WHERE value = ?)
+
+// NOT contains
+$qb->from('users')
+    ->whereJsonDoesntContain('options->blocked_countries', 'PH');
+
+// OR contains variants
+$qb->from('products')
+    ->whereJsonContains('tags', 'sale')
+    ->orWhereJsonContains('tags', 'featured');
+
+// Check JSON array length
+$qb->from('users')
+    ->whereJsonLength('options->languages', '>', 2);
+// MySQL:  WHERE JSON_LENGTH(JSON_EXTRACT(options, '$.languages')) > ?
+// PgSQL:  WHERE jsonb_array_length((options->'languages')::jsonb) > ?
+// SQLite: WHERE json_array_length(json_extract(options, '$.languages')) > ?
+
+// Exact length
+$qb->from('posts')
+    ->whereJsonLength('metadata->tags', '=', 0);
+
+// OR length variant
+$qb->from('users')
+    ->whereJsonLength('options->languages', '>=', 3)
+    ->orWhereJsonLength('options->skills', '>', 5);
+
+// Mixing JSON conditions with regular conditions
+$qb->from('users')
+    ->where('active', true)
+    ->whereJson('options->theme', 'dark')
+    ->whereJsonContains('options->languages', 'en')
+    ->whereJsonLength('options->skills', '>', 2);
+```
 
 ---
 
@@ -918,9 +978,7 @@ dd(): never
 **Examples:**
 ```php
 // Get SQL query
-$sql = $qb->from('users')
-    ->where('status', 'active')
-    ->toSql();
+$sql = $qb->from('users')->where('status', 'active')->toSql();
 echo $sql; // SELECT * FROM users WHERE status = ?
 
 // Get bindings
@@ -932,16 +990,10 @@ $rawSql = $qb->toRawSql();
 echo $rawSql; // SELECT * FROM users WHERE status = 'active'
 
 // Dump and continue
-$qb->from('users')
-    ->where('status', 'active')
-    ->dump()
-    ->where('age', '>=', 18)
-    ->dump();
+$qb->from('users')->where('status', 'active')->dump()->where('age', '>=', 18)->dump();
 
 // Dump and die (stops execution)
-$qb->from('users')
-    ->where('status', 'active')
-    ->dd();
+$qb->from('users')->where('status', 'active')->dd();
 ```
 
 ---
@@ -950,7 +1002,7 @@ $qb->from('users')
 
 Builds SQL query strings from accumulated state.
 
-**Dependencies:** Requires `QueryBuilderCore` and properties from condition/join/grouping traits
+**Dependencies:** Requires `QueryBuilderCore` and properties from condition/join/grouping/cte traits
 
 **Protected Methods** (used internally or for extension):
 ```php
@@ -963,6 +1015,7 @@ buildUpdateQuery(array $data): string
 buildDeleteQuery(): string
 buildWhereClause(): string
 buildHavingClause(): string
+buildCteClause(): string
 buildAggregateQuery(string $function, string $column): string
 buildUpsertQuery(array $data, string|array $uniqueColumns, ?array $updateColumns = null): string
 buildExistsQuery(): string
@@ -971,13 +1024,13 @@ buildDecrementQuery(string $column, int|float $amount = 1, array $extra = []): s
 ```
 
 > `buildHavingClause()` handles both `AND` and `OR` conditions, driven by the `$boolean` parameter on `having()` and `havingRaw()`.
+> `buildCteClause()` is prepended automatically by `buildSelectQuery()`, `buildCountQuery()`, and `buildAggregateQuery()` — you do not need to call it manually.
 
 #### `buildExistsQuery()`
 
 Wraps the current query in `SELECT EXISTS(...)`. Internally resets the select to `1` and strips `ORDER BY` (unless `LIMIT`/`OFFSET` is set) to keep the subquery lean.
 
 ```php
-// In your concrete builder:
 public function exists(): bool
 {
     $stmt = $this->pdo->prepare($this->buildExistsQuery());
@@ -985,27 +1038,15 @@ public function exists(): bool
     return (bool) $stmt->fetchColumn();
 }
 
-// Usage
-$exists = $qb->from('users')
-    ->where('email', 'john@example.com')
-    ->exists();
+$exists = $qb->from('users')->where('email', 'john@example.com')->exists();
 // SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)
-
-$exists = $qb->from('orders')
-    ->where('user_id', 42)
-    ->where('status', 'pending')
-    ->exists();
-// SELECT EXISTS(SELECT 1 FROM orders WHERE user_id = ? AND status = ?)
 ```
-
-> `ORDER BY` is silently stripped when no `LIMIT`/`OFFSET` is present, since ordering has no effect on existence checks.
 
 #### `buildIncrementQuery()`
 
-Builds an `UPDATE` that adds `$amount` to a column atomically. The optional `$extra` array lets you update additional columns in the same statement — their values bind to the `SET` placeholders, which appear **before** the `WHERE` bindings in the final `execute()` call.
+Builds an atomic `UPDATE` that adds `$amount` to a column. `$extra` values bind before WHERE bindings.
 
 ```php
-// In your concrete builder:
 public function increment(string $column, int|float $amount = 1, array $extra = []): int
 {
     $stmt = $this->pdo->prepare($this->buildIncrementQuery($column, $amount, $extra));
@@ -1013,23 +1054,15 @@ public function increment(string $column, int|float $amount = 1, array $extra = 
     return $stmt->rowCount();
 }
 
-// Usage
-$qb->from('products')->where('id', 5)->increment('stock');
-// UPDATE products SET stock = stock + 1 WHERE id = ?
-
-$qb->from('products')->where('id', 5)->increment('stock', 10);
-// UPDATE products SET stock = stock + 10 WHERE id = ?
-
 $qb->from('products')->where('id', 5)->increment('stock', 3, ['updated_at' => now()]);
 // UPDATE products SET stock = stock + 3, updated_at = ? WHERE id = ?
 ```
 
 #### `buildDecrementQuery()`
 
-Mirror of `buildIncrementQuery()` — subtracts `$amount` from the column instead. Binding order is the same: `$extra` values first, then WHERE bindings.
+Mirror of `buildIncrementQuery()` — subtracts `$amount`. Same binding order.
 
 ```php
-// In your concrete builder:
 public function decrement(string $column, int|float $amount = 1, array $extra = []): int
 {
     $stmt = $this->pdo->prepare($this->buildDecrementQuery($column, $amount, $extra));
@@ -1037,52 +1070,30 @@ public function decrement(string $column, int|float $amount = 1, array $extra = 
     return $stmt->rowCount();
 }
 
-// Usage
-$qb->from('products')->where('id', 5)->decrement('stock');
-// UPDATE products SET stock = stock - 1 WHERE id = ?
-
 $qb->from('accounts')->where('user_id', 12)->decrement('balance', 50.00, ['last_withdrawal' => now()]);
 // UPDATE accounts SET balance = balance - 50, last_withdrawal = ? WHERE user_id = ?
 ```
 
 #### `buildInsertIgnoreQuery()`
 
-Builds a driver-aware insert that silently skips rows that would violate a unique constraint. Supports both single-row and batch inserts.
+Builds a driver-aware insert that silently skips rows violating a unique constraint. Supports single-row and batch inserts.
 
-| Driver | Syntax used |
+| Driver | Syntax |
 | :--- | :--- |
 | MySQL | `INSERT IGNORE INTO ...` |
 | PostgreSQL | `INSERT INTO ... ON CONFLICT DO NOTHING` |
 | SQLite | `INSERT OR IGNORE INTO ...` |
 
 ```php
-// In your concrete builder:
 public function insertIgnore(array $data): bool
 {
     $stmt = $this->pdo->prepare($this->buildInsertIgnoreQuery($data));
-
-    // Single row
-    if (! is_array(reset($data))) {
-        return $stmt->execute(array_values($data));
-    }
-
-    // Batch
-    $values = array_merge(...array_map('array_values', $data));
+    $isBatch = is_array(reset($data));
+    $values  = $isBatch ? array_merge(...array_map('array_values', $data)) : array_values($data);
     return $stmt->execute($values);
 }
 
-// Single-row usage
 $qb->from('tags')->insertIgnore(['name' => 'php', 'slug' => 'php']);
-// MySQL:  INSERT IGNORE INTO tags (name, slug) VALUES (?, ?)
-// PgSQL:  INSERT INTO tags (name, slug) VALUES (?, ?) ON CONFLICT DO NOTHING
-// SQLite: INSERT OR IGNORE INTO tags (name, slug) VALUES (?, ?)
-
-// Batch usage
-$qb->from('tags')->insertIgnore([
-    ['name' => 'php',        'slug' => 'php'],
-    ['name' => 'javascript', 'slug' => 'javascript'],
-]);
-// Inserts all rows; duplicate-key rows are silently skipped
 ```
 
 ---
@@ -1097,15 +1108,16 @@ $base = $qb->from('users')->where('status', 'active');
 $query1 = $base->where('age', '>=', 18);
 $query2 = $base->where('country', 'US');
 
-// $base remains unchanged; $query1 and $query2 are independent
+// $base, $query1, and $query2 are three completely independent queries
 
-// Same applies to locks, unions, and ordering
+// Same applies to locks, unions, CTEs, and ordering
 $plain    = $qb->from('orders')->where('status', 'pending');
 $locked   = $plain->lockForUpdate();
 $union    = $plain->union(fn($q) => $q->from('archived_orders'));
+$withCte  = $plain->with('base', fn($q) => $q->from('orders')->where('status', 'pending'));
 $sorted   = $plain->latest();
 
-// $plain has no lock, no union, and no ORDER BY; each fork is independent
+// $plain is unchanged; every fork is completely independent
 ```
 
 ---
@@ -1124,10 +1136,6 @@ class ExecutableQueryBuilder extends QueryBuilderBase
 {
     public function __construct(private PDO $pdo) {}
 
-    /**
-     * REQUIRED when your constructor takes arguments.
-     * Called internally by whereExists(), whereGroup(), union(), etc.
-     */
     protected function newQuery(): static
     {
         return new static($this->pdo);
@@ -1168,17 +1176,14 @@ class ExecutableQueryBuilder extends QueryBuilderBase
     public function insertBatch(array $data): bool
     {
         $stmt = $this->pdo->prepare($this->buildInsertBatchQuery($data));
-        $values = array_merge(...array_map('array_values', $data));
-        return $stmt->execute($values);
+        return $stmt->execute(array_merge(...array_map('array_values', $data)));
     }
 
     public function insertIgnore(array $data): bool
     {
-        $stmt = $this->pdo->prepare($this->buildInsertIgnoreQuery($data));
+        $stmt   = $this->pdo->prepare($this->buildInsertIgnoreQuery($data));
         $isBatch = is_array(reset($data));
-        $values  = $isBatch
-            ? array_merge(...array_map('array_values', $data))
-            : array_values($data);
+        $values  = $isBatch ? array_merge(...array_map('array_values', $data)) : array_values($data);
         return $stmt->execute($values);
     }
 
@@ -1215,47 +1220,31 @@ class ExecutableQueryBuilder extends QueryBuilderBase
 $pdo = new PDO('mysql:host=localhost;dbname=mydb', 'user', 'pass');
 $qb  = new ExecutableQueryBuilder($pdo);
 
-$users = $qb->from('users')
-    ->where('status', 'active')
-    ->latest()
-    ->limit(10)
+// Basic query
+$users = $qb->from('users')->where('status', 'active')->latest()->limit(10)->get();
+
+// CTE query
+$report = $qb->from('summary')
+    ->with('summary', fn($q) => $q->from('orders')->select('user_id')->selectRaw('SUM(total) as spent')->groupBy('user_id'))
+    ->where('spent', '>', 500)
     ->get();
+
+// JSON condition
+$darkModeUsers = $qb->from('users')->whereJson('options->theme', 'dark')->get();
 
 // Conditional filtering
-$search = 'john';
-$users  = $qb->from('users')
+$results = $qb->from('users')
     ->when($search, fn($q, $v) => $q->like('name', $v))
-    ->oldest()
+    ->when($role,   fn($q, $v) => $q->where('role', $v))
+    ->latest()
     ->get();
 
-// Random sample
-$featured = $qb->from('products')
-    ->where('featured', true)
-    ->inRandomOrder()
-    ->limit(5)
+// Advanced join with closure
+$orders = $qb->from('orders')
+    ->leftJoin('users', function($join) {
+        return $join->on('users.id', '=', 'orders.user_id')->where('users.active', true);
+    })
     ->get();
-
-// EXISTS check
-$hasOrders = $qb->from('orders')->where('user_id', 42)->exists();
-
-// Insert ignore
-$qb->from('tags')->insertIgnore(['name' => 'php', 'slug' => 'php']);
-
-// Increment / decrement
-$qb->from('products')->where('id', 5)->increment('stock', 10);
-$qb->from('accounts')->where('user_id', 12)->decrement('balance', 50.00);
-
-// Locking inside a transaction
-$pdo->beginTransaction();
-$job = $qb->from('jobs')
-    ->where('status', 'pending')
-    ->oldest()
-    ->limit(1)
-    ->lockForUpdate()
-    ->skipLocked()
-    ->first();
-// process $job ...
-$pdo->commit();
 ```
 
 ---
@@ -1274,6 +1263,8 @@ class ReadOnlyQueryBuilder
     use QueryJoin;
     use QueryGrouping;
     use QueryUnion;
+    use QueryCte;
+    use QueryJson;
     use QueryDebug;
 }
 ```
@@ -1303,6 +1294,7 @@ class ReportingQueryBuilder
     use QueryJoin;
     use QueryGrouping;
     use QueryUnion;
+    use QueryCte;
     use QueryDebug;
 }
 ```
@@ -1310,7 +1302,6 @@ class ReportingQueryBuilder
 ### 4. Full-Featured (All Traits)
 
 ```php
-// Use QueryBuilderBase directly — it already composes everything.
 use Rcalicdan\QueryBuilderPrimitives\QueryBuilderBase;
 
 class MyQueryBuilder extends QueryBuilderBase
@@ -1333,34 +1324,26 @@ class MyQueryBuilder extends QueryBuilderBase
 ```php
 // (status = 'active' AND role = 'admin') OR (status = 'pending' AND invited = true)
 $qb->from('users')
-    ->whereGroup(function($q) {
-        return $q->where('status', 'active')
-                 ->where('role', 'admin');
-    })
-    ->whereGroup(function($q) {
-        return $q->where('status', 'pending')
-                 ->where('invited', true);
-    });
+    ->whereGroup(fn($q) => $q->where('status', 'active')->where('role', 'admin'))
+    ->whereGroup(fn($q) => $q->where('status', 'pending')->where('invited', true));
 ```
 
 ### Conditional Query Building
 
 ```php
-// Apply filters only when present — no if/else branches needed
 $qb->from('products')
     ->when($categoryId, fn($q, $v) => $q->where('category_id', $v))
     ->when($maxPrice,   fn($q, $v) => $q->where('price', '<=', $v))
     ->when($inStock,    fn($q, $v) => $q->where('stock', '>', 0))
     ->unless($showAll,  fn($q, $v) => $q->where('active', true))
-    ->latest('updated_at')
-    ->get();
+    ->latest('updated_at');
 
 // Dynamic sort with fallback
 $qb->from('posts')
     ->when(
         $sortColumn,
         fn($q, $v) => $q->orderBy($v, $sortDirection ?? 'ASC'),
-        fn($q, $v) => $q->latest()   // default sort
+        fn($q, $v) => $q->latest()
     );
 ```
 
@@ -1374,18 +1357,11 @@ $qb->from('orders')
     ->groupBy('user_id')
     ->having('order_count', '>', 10)
     ->orHaving('total_spent', '>', 5000);
-// HAVING order_count > ? OR total_spent > ?
-
-$qb->from('stats')
-    ->groupBy('team_id')
-    ->havingRaw('SUM(points) > ?', [100])
-    ->orHavingRaw('COUNT(wins) >= ?', [20]);
 ```
 
 ### Subquery Patterns
 
 ```php
-// Users who have placed orders over $1000
 $qb->from('users')
     ->whereExists(function($q) {
         return $q->from('orders')
@@ -1393,7 +1369,6 @@ $qb->from('users')
                  ->where('total', '>', 1000);
     });
 
-// Column-to-column comparison
 $qb->from('audit_log')
     ->whereColumn('expected_hash', 'actual_hash')
     ->orWhereColumn('verified_at', '>', 'created_at');
@@ -1402,12 +1377,10 @@ $qb->from('audit_log')
 ### Existence Checks
 
 ```php
-// Simple record check — no need to fetch data
 if ($qb->from('users')->where('email', $email)->exists()) {
     throw new \RuntimeException('Email already registered.');
 }
 
-// Check with joins
 $isEnrolled = $qb->from('enrollments')
     ->where('user_id', $userId)
     ->where('course_id', $courseId)
@@ -1418,28 +1391,18 @@ $isEnrolled = $qb->from('enrollments')
 ### Atomic Counters
 
 ```php
-// Increment page views
 $qb->from('posts')->where('id', $postId)->increment('views');
 
-// Decrement remaining seats and record the timestamp
 $qb->from('events')
     ->where('id', $eventId)
     ->decrement('seats_remaining', 1, ['last_booking_at' => now()]);
-
-// Batch-safe stock adjustment
-$qb->from('products')
-    ->where('sku', $sku)
-    ->where('stock', '>', 0)
-    ->decrement('stock', $quantity);
 ```
 
 ### Insert Ignore
 
 ```php
-// Safely insert without failing on duplicate keys
 $qb->from('tags')->insertIgnore(['name' => 'php', 'slug' => 'php']);
 
-// Batch variant — duplicates are skipped, rest are inserted
 $qb->from('user_roles')->insertIgnore([
     ['user_id' => 1, 'role' => 'editor'],
     ['user_id' => 2, 'role' => 'editor'],
@@ -1447,28 +1410,81 @@ $qb->from('user_roles')->insertIgnore([
 ]);
 ```
 
+### CTE Patterns
+
+```php
+// Simple pre-filter CTE
+$qb->from('active_users')
+    ->with('active_users', fn($q) => $q->from('users')->where('status', 'active'))
+    ->select('id', 'name')
+    ->latest();
+
+// Chained CTEs — each builds on the previous
+$qb->from('final')
+    ->with('raw',    fn($q) => $q->from('orders')->where('status', 'completed'))
+    ->with('totals', fn($q) => $q->from('raw')->select('user_id')->selectRaw('SUM(total) as spent')->groupBy('user_id'))
+    ->with('final',  fn($q) => $q->from('totals')->where('spent', '>', 500))
+    ->orderByDesc('spent');
+
+// Recursive CTE — category tree traversal
+$qb->from('tree')
+    ->with('tree', function($q) {
+        return $q->from('categories')
+                 ->select('id', 'name', 'parent_id')
+                 ->where('parent_id', null)
+                 ->unionAll(fn($u) => $u
+                     ->from('categories')
+                     ->select('categories.id', 'categories.name', 'categories.parent_id')
+                     ->join('tree', 'tree.id = categories.parent_id'));
+    }, recursive: true)
+    ->get();
+```
+
+### JSON Patterns
+
+```php
+// Scalar JSON field comparison
+$qb->from('users')->whereJson('options->theme', 'dark')->get();
+
+// Nested path
+$qb->from('users')->whereJson('options->preferences->notifications', true)->get();
+
+// Contains check
+$qb->from('users')->whereJsonContains('options->languages', 'en')->get();
+
+// Does not contain
+$qb->from('users')->whereJsonDoesntContain('options->blocked', 'PH')->get();
+
+// Array length
+$qb->from('users')->whereJsonLength('options->skills', '>', 3)->get();
+
+// Combining JSON and regular conditions
+$qb->from('users')
+    ->where('active', true)
+    ->whereJson('options->theme', 'dark')
+    ->whereJsonContains('options->languages', 'en')
+    ->whereJsonLength('options->skills', '>=', 2)
+    ->latest()
+    ->get();
+
+// OR JSON conditions
+$qb->from('users')
+    ->whereJson('settings->role', 'admin')
+    ->orWhereJson('settings->role', 'moderator')
+    ->get();
+```
+
 ### Pessimistic Locking Patterns
 
 ```php
 // Payment processing
 $pdo->beginTransaction();
-$order = $qb->from('orders')
-    ->where('id', $orderId)
-    ->where('status', 'pending')
-    ->lockForUpdate()
-    ->first();
+$order = $qb->from('orders')->where('id', $orderId)->where('status', 'pending')->lockForUpdate()->first();
 $pdo->commit();
 
 // Job queue with SKIP LOCKED
 $pdo->beginTransaction();
-$job = $qb->from('jobs')
-    ->where('status', 'available')
-    ->orderByDesc('priority')
-    ->oldest()
-    ->limit(1)
-    ->lockForUpdate()
-    ->skipLocked()
-    ->first();
+$job = $qb->from('jobs')->where('status', 'available')->orderByDesc('priority')->oldest()->limit(1)->lockForUpdate()->skipLocked()->first();
 $pdo->commit();
 ```
 
@@ -1478,22 +1494,14 @@ $pdo->commit();
 // Combine partitioned tables
 $qb->from('logs_2024')
     ->select('id', 'user_id', 'action', 'created_at')
-    ->unionAll(function($q) {
-        return $q->from('logs_2025')
-                 ->select('id', 'user_id', 'action', 'created_at');
-    })
+    ->unionAll(fn($q) => $q->from('logs_2025')->select('id', 'user_id', 'action', 'created_at'))
     ->latest('created_at')
     ->limit(100);
 
-// Merge different record types into a single feed
+// Merge different record types
 $qb->from('posts')
-    ->select('id', 'title', 'created_at')
-    ->selectRaw("'post' as type")
-    ->union(function($q) {
-        return $q->from('comments')
-                 ->select('id', 'body as title', 'created_at')
-                 ->selectRaw("'comment' as type");
-    })
+    ->select('id', 'title', 'created_at')->selectRaw("'post' as type")
+    ->union(fn($q) => $q->from('comments')->select('id', 'body as title', 'created_at')->selectRaw("'comment' as type"))
     ->latest('created_at');
 ```
 
