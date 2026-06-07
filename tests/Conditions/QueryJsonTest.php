@@ -244,9 +244,42 @@ describe('QueryJson Primitives - Deep Logical & Operator Edge Cases', function (
     test('compiles deep array index-based extraction paths', function () {
         $query = MockQueryBuilder::table('users')
             ->setDriver('sqlite')
-            ->whereJson('options->languages->0', 'en');
+            ->whereJson('options->languages->0', 'en')
+        ;
 
         expect($query->toSql())->toBe("SELECT * FROM users WHERE json_extract(options, '$.languages.0') = ?");
+        expect($query->getBindings())->toBe(['en']);
+    });
+});
+
+describe('QueryJson Primitives - Negative Containment (DoesntContain)', function () {
+    test('compiles MySQL NOT JSON_CONTAINS', function () {
+        $query = MockQueryBuilder::table('users')
+            ->setDriver('mysql')
+            ->whereJsonDoesntContain('options->languages', 'en')
+        ;
+
+        expect($query->toSql())->toBe("SELECT * FROM users WHERE NOT JSON_CONTAINS(options, ?, '$.languages')");
+        expect($query->getBindings())->toBe(['"en"']);
+    });
+
+    test('compiles PostgreSQL NOT jsonb containment operator', function () {
+        $query = MockQueryBuilder::table('users')
+            ->setDriver('pgsql')
+            ->whereJsonDoesntContain('options->languages', 'en')
+        ;
+
+        expect($query->toSql())->toBe("SELECT * FROM users WHERE NOT (options->'languages')::jsonb @> ?::jsonb");
+        expect($query->getBindings())->toBe(['"en"']);
+    });
+
+    test('compiles SQLite NOT EXISTS on json_each', function () {
+        $query = MockQueryBuilder::table('users')
+            ->setDriver('sqlite')
+            ->whereJsonDoesntContain('options->languages', 'en')
+        ;
+
+        expect($query->toSql())->toBe("SELECT * FROM users WHERE NOT EXISTS (SELECT 1 FROM json_each(json_extract(options, '$.languages')) WHERE value = ?)");
         expect($query->getBindings())->toBe(['en']);
     });
 });

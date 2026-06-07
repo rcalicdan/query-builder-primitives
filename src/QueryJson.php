@@ -160,6 +160,49 @@ trait QueryJson
     }
 
     /**
+     * Add a condition checking if a JSON array does NOT contain a specific value.
+     *
+     * @param string $column The column name with path (e.g. 'options->languages').
+     * @param mixed $value The value to search for.
+     * @param string $boolean Logical operator ('AND' or 'OR').
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function whereJsonDoesntContain(string $column, mixed $value, string $boolean = 'AND'): static
+    {
+        $instance = clone $this;
+
+        $index = \count($instance->jsonConditions);
+        $instance->jsonConditions[] = [
+            'type' => 'whereJsonDoesntContain',
+            'column' => $column,
+            'operator' => '',
+            'value' => $value,
+        ];
+
+        $instance->conditionOrder[] = [
+            'type' => strtolower($boolean),
+            'sql' => "json:{$index}",
+            'bindings' => [$value],
+        ];
+
+        return $instance;
+    }
+
+    /**
+     * Add an OR condition checking if a JSON array does NOT contain a specific value.
+     *
+     * @param string $column The column name with path.
+     * @param mixed $value The value to search for.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function orWhereJsonDoesntContain(string $column, mixed $value): static
+    {
+        return $this->whereJsonDoesntContain($column, $value, 'OR');
+    }
+
+    /**
      * Compile a JSON condition into its database-specific dialect.
      *
      * @param int $index
@@ -184,9 +227,24 @@ trait QueryJson
         return match ($condition['type']) {
             'whereJson' => $this->compileJsonExtract($driver, $columnName, $pathParts, $operator, $value),
             'whereJsonContains' => $this->compileJsonContains($driver, $columnName, $pathParts, $value),
+            'whereJsonDoesntContain' => $this->compileJsonDoesntContain($driver, $columnName, $pathParts, $value),
             'whereJsonLength' => $this->compileJsonLength($driver, $columnName, $pathParts, $operator, $value),
             default => ['sql' => '0=1', 'bindings' => []],
         };
+    }
+
+    /**
+     * @param array<string> $pathParts
+     *
+     * @return array{sql: string, bindings: array<mixed>}
+     */
+    private function compileJsonDoesntContain(string $driver, string $column, array $pathParts, mixed $value): array
+    {
+        $compiled = $this->compileJsonContains($driver, $column, $pathParts, $value);
+
+        $compiled['sql'] = 'NOT ' . $compiled['sql'];
+
+        return $compiled;
     }
 
     /**

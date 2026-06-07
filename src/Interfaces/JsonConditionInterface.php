@@ -73,4 +73,25 @@ interface JsonConditionInterface
      * @return static Returns a new query builder instance for method chaining.
      */
     public function orWhereJsonLength(string $column, string $operator, int $value): static;
+
+    /**
+     * Add a condition checking if a JSON array does NOT contain a specific value.
+     *
+     * @param string $column The column name with path (e.g. 'options->languages').
+     * @param mixed $value The value to search for.
+     * @param string $boolean Logical operator ('AND' or 'OR').
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function whereJsonDoesntContain(string $column, mixed $value, string $boolean = 'AND'): static;
+
+    /**
+     * Add an OR condition checking if a JSON array does NOT contain a specific value.
+     *
+     * @param string $column The column name with path.
+     * @param mixed $value The value to search for.
+     *
+     * @return static Returns a new query builder instance for method chaining.
+     */
+    public function orWhereJsonDoesntContain(string $column, mixed $value): static;
 }
