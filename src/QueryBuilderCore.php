@@ -20,6 +20,7 @@ trait QueryBuilderCore
      * @var array<string, array<mixed>> The parameter bindings for the query, grouped by type.
      */
     protected array $bindings = [
+        'cte' => [],
         'select' => [],
         'join' => [],
         'where' => [],
@@ -208,7 +209,9 @@ trait QueryBuilderCore
      */
     protected function getCompiledBindings(): array
     {
+        $cteBindings = $this->bindings['cte'] ?? [];
         $joinBindings = $this->bindings['join'] ?? [];
+
         if (\count($this->conditionOrder) > 0) {
             $whereBindings = [];
             foreach ($this->conditionOrder as $item) {
@@ -216,6 +219,7 @@ trait QueryBuilderCore
             }
 
             return [
+                ...$cteBindings,
                 ...$this->bindings['select'],
                 ...$joinBindings,
                 ...$whereBindings,
@@ -237,6 +241,7 @@ trait QueryBuilderCore
         ];
 
         return [
+            ...$cteBindings,
             ...$this->bindings['select'],
             ...$joinBindings,
             ...$whereBindings,

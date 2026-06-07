@@ -13,7 +13,8 @@ trait SqlBuilder
      */
     protected function buildSelectQuery(): string
     {
-        $sql = 'SELECT ' . implode(', ', $this->select);
+        $sql = $this->buildCteClause();
+        $sql .= 'SELECT ' . implode(', ', $this->select);
         $sql .= ' FROM ' . $this->table;
 
         foreach ($this->joins as $join) {
@@ -57,6 +58,30 @@ trait SqlBuilder
         }
 
         return $sql;
+    }
+
+    /**
+     * Build the Common Table Expression (CTE) clause.
+     */
+    protected function buildCteClause(): string
+    {
+        if ($this->ctes === []) {
+            return '';
+        }
+
+        $parts = [];
+        $isRecursive = false;
+
+        foreach ($this->ctes as $cte) {
+            if ($cte['recursive']) {
+                $isRecursive = true;
+            }
+            $parts[] = "{$cte['name']} AS ({$cte['sql']})";
+        }
+
+        $keyword = $isRecursive ? 'WITH RECURSIVE' : 'WITH';
+
+        return $keyword . ' ' . implode(', ', $parts) . ' ';
     }
 
     /**
@@ -104,7 +129,8 @@ trait SqlBuilder
      */
     protected function buildCountQuery(string $column = '*'): string
     {
-        $sql = "SELECT COUNT({$column}) FROM " . $this->table;
+        $sql = $this->buildCteClause();
+        $sql .= "SELECT COUNT({$column}) FROM " . $this->table;
 
         foreach ($this->joins as $join) {
             if ($join['type'] === 'CROSS') {
@@ -442,7 +468,9 @@ trait SqlBuilder
      */
     protected function buildAggregateQuery(string $function, string $column): string
     {
-        $sql = "SELECT {$function}({$column}) FROM {$this->table}";
+        $sql = $this->buildCteClause();
+
+        $sql .= "SELECT {$function}({$column}) FROM {$this->table}";
 
         foreach ($this->joins as $join) {
             if ($join['type'] === 'CROSS') {

@@ -18,6 +18,7 @@ interface QueryBuilderPrimitiveInterface extends
     GroupingInterface,
     LockingInterface,
     UnionInterface,
+    CteInterface,
     DebugInterface
 {
 }

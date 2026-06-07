@@ -8,6 +8,7 @@ use Rcalicdan\QueryBuilderPrimitives\QueryAdvancedConditions;
 use Rcalicdan\QueryBuilderPrimitives\QueryBuilderCore;
 use Rcalicdan\QueryBuilderPrimitives\QueryConditionable;
 use Rcalicdan\QueryBuilderPrimitives\QueryConditions;
+use Rcalicdan\QueryBuilderPrimitives\QueryCte;
 use Rcalicdan\QueryBuilderPrimitives\QueryDebug;
 use Rcalicdan\QueryBuilderPrimitives\QueryGrouping;
 use Rcalicdan\QueryBuilderPrimitives\QueryJoin;
@@ -21,6 +22,7 @@ class MockQueryBuilder
     use QueryBuilderCore;
     use QueryConditions;
     use QueryConditionable;
+    use QueryCte;
     use QueryDebug;
     use QueryGrouping;
     use QueryJoin;
