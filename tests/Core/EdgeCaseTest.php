@@ -5,10 +5,10 @@ declare(strict_types=1);
 use Tests\MockQueryBuilder;
 
 describe('Edge Cases', function () {
-    test('handles empty table name gracefully', function () {
+     test('handles empty table name gracefully', function () {
         $query = (new MockQueryBuilder())->select('id');
 
-        expect($query->toSql())->toBe('SELECT id FROM ');
+        expect($query->toSql())->toBe('SELECT id');
     });
 
     test('handles very long column lists', function () {

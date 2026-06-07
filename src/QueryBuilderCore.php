@@ -215,7 +215,13 @@ trait QueryBuilderCore
         if (\count($this->conditionOrder) > 0) {
             $whereBindings = [];
             foreach ($this->conditionOrder as $item) {
-                $whereBindings = [...$whereBindings, ...$item['bindings']];
+                if (isset($item['sql']) && str_starts_with((string) $item['sql'], 'json:')) {
+                    $index = (int) explode(':', $item['sql'])[1];
+                    $compiled = $this->compileJsonCondition($index);
+                    $whereBindings = [...$whereBindings, ...$compiled['bindings']];
+                } else {
+                    $whereBindings = [...$whereBindings, ...$item['bindings']];
+                }
             }
 
             return [

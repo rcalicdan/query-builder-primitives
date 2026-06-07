@@ -12,6 +12,7 @@ use Rcalicdan\QueryBuilderPrimitives\QueryCte;
 use Rcalicdan\QueryBuilderPrimitives\QueryDebug;
 use Rcalicdan\QueryBuilderPrimitives\QueryGrouping;
 use Rcalicdan\QueryBuilderPrimitives\QueryJoin;
+use Rcalicdan\QueryBuilderPrimitives\QueryJson;
 use Rcalicdan\QueryBuilderPrimitives\QueryLocking;
 use Rcalicdan\QueryBuilderPrimitives\QueryUnion;
 use Rcalicdan\QueryBuilderPrimitives\SqlBuilder;
@@ -21,6 +22,7 @@ class MockQueryBuilder
     use QueryAdvancedConditions;
     use QueryBuilderCore;
     use QueryConditions;
+    use QueryJson;
     use QueryConditionable;
     use QueryCte;
     use QueryDebug;

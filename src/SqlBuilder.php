@@ -136,7 +136,7 @@ trait SqlBuilder
         $sql .= "SELECT COUNT({$column})";
 
         if ($this->table !== '') {
-            $sql .= " FROM " . $this->table;
+            $sql .= ' FROM ' . $this->table;
         }
 
         foreach ($this->joins as $join) {
@@ -420,6 +420,12 @@ trait SqlBuilder
         $sql = '';
         foreach ($this->conditionOrder as $index => $condition) {
             $sqlString = $condition['sql'] ?? '';
+
+            if (str_starts_with((string) $sqlString, 'json:')) {
+                $idx = (int) explode(':', $sqlString)[1];
+                $compiled = $this->compileJsonCondition($idx);
+                $sqlString = $compiled['sql'];
+            }
 
             if ($index === 0) {
                 $sql .= $sqlString;

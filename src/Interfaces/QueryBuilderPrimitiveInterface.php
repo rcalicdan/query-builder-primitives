@@ -13,6 +13,7 @@ interface QueryBuilderPrimitiveInterface extends
     CoreInterface,
     ConditionalInterface,
     ConditionInterface,
+    JsonConditionInterface,
     AdvancedConditionInterface,
     JoinInterface,
     GroupingInterface,
