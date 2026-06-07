@@ -84,11 +84,11 @@ trait QueryDebug
     }
 
     /**
-     * Dump the query and continue execution (like Laravel's dump()).
+     * Dump the query and continue execution.
      *
      * @return static Returns the same query builder instance for method chaining.
      */
-    public function dump(): static
+    public function debug(): static
     {
         $this->displayQuery(false);
 
@@ -98,7 +98,7 @@ trait QueryDebug
     /**
      * Dump the query and die (like Laravel's dd()).
      */
-    public function dd(): never
+    public function halt(): never
     {
         $this->displayQuery(true);
         exit(1);

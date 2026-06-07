@@ -38,7 +38,7 @@ describe('QueryDebug', function () {
         $query = MockQueryBuilder::table('users');
 
         ob_start();
-        $result = $query->dump();
+        $result = $query->debug();
         ob_end_clean();
 
         expect($result)->toBe($query);

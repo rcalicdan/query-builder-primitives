@@ -73,7 +73,7 @@ Queries are built through **immutable method chaining** — every method returns
 - **Safe reuse.** A base query can be forked into multiple independent queries without any of them affecting each other. Build a `$base` once, branch it as many times as you need.
 - **No hidden state.** In a mutable builder, calling methods on a shared instance from different parts of your code produces unpredictable results. With immutable chaining, each chain is self-contained and its SQL is exactly what you wrote.
 - **Composable defaults.** You can define a pre-configured query (scoped to a tenant, filtered by status, ordered by default) and pass it around freely, knowing no callee can corrupt it.
-- **Easier debugging.** Because each step produces a discrete value, you can call `.dump()` or `.toSql()` at any point in the chain without affecting the final query.
+- **Easier debugging.** Because each step produces a discrete value, you can call `.halt()` or `.toSql()` at any point in the chain without affecting the final query.
 - **Safe for asynchronous execution.** When multiple coroutines or fibers execute concurrently and share a mutable builder, one coroutine's `where()` call can bleed into another's query mid-flight — a race condition that is silent, non-deterministic, and extremely difficult to reproduce. Because every method on this builder returns a new independent instance, each coroutine or fiber holds its own copy of the query state from the moment it branches off. There is no shared mutable object to race on, so concurrent query construction is safe by construction rather than by discipline.
 
 ```php
@@ -242,7 +242,7 @@ $qb->from('users')
     ->groupBy('users.id')
     ->latest()
     ->limit(10)
-    ->dd(); // Debug and die
+    ->halt(); // Debug and die
 ```
 
 ---
@@ -971,8 +971,8 @@ Debugging utilities.
 toSql(): string
 getBindings(): array
 toRawSql(): string
-dump(): static
-dd(): never
+debug(): static
+halt(): never
 ```
 
 **Examples:**
@@ -990,10 +990,10 @@ $rawSql = $qb->toRawSql();
 echo $rawSql; // SELECT * FROM users WHERE status = 'active'
 
 // Dump and continue
-$qb->from('users')->where('status', 'active')->dump()->where('age', '>=', 18)->dump();
+$qb->from('users')->where('status', 'active')->halt()->where('age', '>=', 18)->halt();
 
 // Dump and die (stops execution)
-$qb->from('users')->where('status', 'active')->dd();
+$qb->from('users')->where('status', 'active')->halt();
 ```
 
 ---

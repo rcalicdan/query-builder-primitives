@@ -29,14 +29,16 @@ interface DebugInterface
     public function toRawSql(): string;
 
     /**
-     * Dump the query and continue execution (like Laravel's dump()).
+     * Output the compiled SQL, raw SQL, and bindings, then continue execution.
      *
      * @return static Returns the same query builder instance for method chaining.
      */
-    public function dump(): static;
+    public function debug(): static;
 
     /**
-     * Dump the query and die (like Laravel's dd()).
+     * Output the compiled SQL, raw SQL, and bindings, then immediately terminate execution.
+     *
+     * @return never
      */
-    public function dd(): never;
+    public function halt(): never;
 }

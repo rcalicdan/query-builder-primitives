@@ -379,7 +379,7 @@ describe('Database Agnostic Pagination', function () {
             ;
 
             ob_start();
-            $query->dump();
+            $query->debug();
             $output = ob_get_clean();
 
             $cleanOutput = preg_replace('/\x1b\[[0-9;]*m/', '', $output);
