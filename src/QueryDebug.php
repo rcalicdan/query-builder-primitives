@@ -84,7 +84,7 @@ trait QueryDebug
     }
 
     /**
-     * Dump the query and continue execution.
+     * Output the compiled SQL, raw SQL, and bindings, then continue execution.
      *
      * @return static Returns the same query builder instance for method chaining.
      */
@@ -96,7 +96,7 @@ trait QueryDebug
     }
 
     /**
-     * Dump the query and die (like Laravel's dd()).
+     * Output the compiled SQL, raw SQL, and bindings, then immediately terminate execution.
      */
     public function halt(): never
     {
@@ -105,7 +105,7 @@ trait QueryDebug
     }
 
     /**
-     * Display query information in a clean, Laravel-like format.
+     * Display query information in a clean, framework-agnostic format.
      *
      * @param bool $die Whether to stop execution after displaying.
      */
@@ -115,7 +115,6 @@ trait QueryDebug
         $bindings = $this->getBindings();
         $rawSql = $this->toRawSql();
 
-        // Check if we're in CLI or web environment
         $isCli = php_sapi_name() === 'cli';
 
         if ($isCli) {
@@ -133,7 +132,7 @@ trait QueryDebug
     protected function displayCliFormat(string $sql, array $bindings, string $rawSql, bool $die): void
     {
         echo "\n" . str_repeat('=', 80) . "\n";
-        echo $die ? "Query Builder DD (Execution Stopped)\n" : "Query Builder Dump\n";
+        echo $die ? "Query Builder Halt (Execution Stopped)\n" : "Query Builder Debug\n";
         echo str_repeat('=', 80) . "\n\n";
 
         echo "\033[1;36mSQL:\033[0m\n";
@@ -154,7 +153,6 @@ trait QueryDebug
         echo "\033[1;32mRaw SQL:\033[0m\n";
         echo $this->highlightSqlCli($rawSql) . "\n\n";
 
-        // Show basic stats
         $this->displayBasicStats();
 
         echo str_repeat('=', 80) . "\n\n";
@@ -167,7 +165,7 @@ trait QueryDebug
      */
     protected function displayWebFormat(string $sql, array $bindings, string $rawSql, bool $die): void
     {
-        $title = $die ? 'Query Builder DD (Execution Stopped)' : 'Query Builder Dump';
+        $title = $die ? 'Query Builder Halt (Execution Stopped)' : 'Query Builder Debug';
 
         echo "<div style='background: #1e1e1e; color: #f8f8f2; font-family: \"Fira Code\", \"Consolas\", monospace; font-size: 14px; padding: 20px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #50fa7b;'>";
         echo "<h3 style='margin: 0 0 20px 0; color: #50fa7b; font-size: 16px;'>🔍 $title</h3>";
@@ -214,11 +212,44 @@ trait QueryDebug
     protected function highlightSqlCli(string $sql): string
     {
         $keywords = [
-            'SELECT', 'FROM', 'WHERE', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'OUTER',
-            'CROSS', 'UNION', 'ALL', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT',
-            'OFFSET', 'FETCH', 'NEXT', 'ROWS', 'ONLY', 'AND', 'OR', 'IN', 'NOT',
-            'IS', 'NULL', 'LIKE', 'BETWEEN', 'EXISTS', 'DISTINCT', 'COUNT', 'SUM',
-            'AVG', 'MIN', 'MAX', 'INSERT', 'UPDATE', 'DELETE',
+            'SELECT',
+            'FROM',
+            'WHERE',
+            'JOIN',
+            'INNER',
+            'LEFT',
+            'RIGHT',
+            'OUTER',
+            'CROSS',
+            'UNION',
+            'ALL',
+            'GROUP BY',
+            'ORDER BY',
+            'HAVING',
+            'LIMIT',
+            'OFFSET',
+            'FETCH',
+            'NEXT',
+            'ROWS',
+            'ONLY',
+            'AND',
+            'OR',
+            'IN',
+            'NOT',
+            'IS',
+            'NULL',
+            'LIKE',
+            'BETWEEN',
+            'EXISTS',
+            'DISTINCT',
+            'COUNT',
+            'SUM',
+            'AVG',
+            'MIN',
+            'MAX',
+            'INSERT',
+            'UPDATE',
+            'DELETE',
         ];
 
         $highlighted = $sql;
@@ -242,11 +273,44 @@ trait QueryDebug
     protected function highlightSqlWeb(string $sql): string
     {
         $keywords = [
-            'SELECT', 'FROM', 'WHERE', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'OUTER',
-            'CROSS', 'UNION', 'ALL', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT',
-            'OFFSET', 'FETCH', 'NEXT', 'ROWS', 'ONLY', 'AND', 'OR', 'IN', 'NOT',
-            'IS', 'NULL', 'LIKE', 'BETWEEN', 'EXISTS', 'DISTINCT', 'COUNT', 'SUM',
-            'AVG', 'MIN', 'MAX', 'INSERT', 'UPDATE', 'DELETE',
+            'SELECT',
+            'FROM',
+            'WHERE',
+            'JOIN',
+            'INNER',
+            'LEFT',
+            'RIGHT',
+            'OUTER',
+            'CROSS',
+            'UNION',
+            'ALL',
+            'GROUP BY',
+            'ORDER BY',
+            'HAVING',
+            'LIMIT',
+            'OFFSET',
+            'FETCH',
+            'NEXT',
+            'ROWS',
+            'ONLY',
+            'AND',
+            'OR',
+            'IN',
+            'NOT',
+            'IS',
+            'NULL',
+            'LIKE',
+            'BETWEEN',
+            'EXISTS',
+            'DISTINCT',
+            'COUNT',
+            'SUM',
+            'AVG',
+            'MIN',
+            'MAX',
+            'INSERT',
+            'UPDATE',
+            'DELETE',
         ];
 
         $highlighted = htmlspecialchars($sql);
