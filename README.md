@@ -802,9 +802,12 @@ Common Table Expressions (CTEs) — `WITH` and `WITH RECURSIVE` clauses. CTEs le
 **Methods:**
 ```php
 with(string $name, callable $callback, bool $recursive = false): static
+withRecursive(string $name, callable $callback): static
 ```
 
-The `$callback` receives a fresh `QueryBuilderPrimitiveInterface` instance and must return it after building the CTE's SELECT query. Multiple `with()` calls on the same chain accumulate CTEs in declaration order. If any CTE is marked `$recursive = true`, the entire `WITH` clause is compiled as `WITH RECURSIVE`.
+`withRecursive()` is a shorthand for `with($name, $callback, recursive: true)` — it exists purely for readability when the recursive intent should be obvious at the call site. Both compile identically. If any CTE in the chain is recursive, the entire `WITH` clause is compiled as `WITH RECURSIVE`.
+
+The `$callback` receives a fresh `QueryBuilderPrimitiveInterface` instance and must return it after building the CTE's SELECT query. Multiple `with()` / `withRecursive()` calls accumulate CTEs in declaration order.
 
 **Examples:**
 ```php
@@ -821,17 +824,34 @@ $qb->from('active_users')
 
 // Multiple CTEs — each references the previous
 $qb->from('final')
-    ->with('base', fn($q) => $q->from('orders')->where('status', 'completed'))
+    ->with('base',   fn($q) => $q->from('orders')->where('status', 'completed'))
     ->with('totals', fn($q) => $q->from('base')->select('user_id')->selectRaw('SUM(total) as spent')->groupBy('user_id'))
-    ->with('final', fn($q) => $q->from('totals')->where('spent', '>', 1000))
+    ->with('final',  fn($q) => $q->from('totals')->where('spent', '>', 1000))
     ->select('user_id', 'spent')
     ->orderByDesc('spent');
 // WITH base AS (...), totals AS (...), final AS (...)
 // SELECT user_id, spent FROM final ORDER BY spent DESC
 
-// Recursive CTE — tree traversal (e.g. org chart, categories)
+// Recursive CTE using with() with explicit flag
 $qb->from('category_tree')
     ->with('category_tree', function($query) {
+        return $query
+            ->from('categories')
+            ->select('id', 'name', 'parent_id')
+            ->where('parent_id', null)
+            ->unionAll(function($q) {
+                return $q
+                    ->from('categories')
+                    ->select('categories.id', 'categories.name', 'categories.parent_id')
+                    ->join('category_tree', 'category_tree.id = categories.parent_id');
+            });
+    }, recursive: true)
+    ->select('id', 'name', 'parent_id')
+    ->toSql();
+
+// Same recursive CTE using withRecursive() — cleaner, intent is obvious
+$qb->from('category_tree')
+    ->withRecursive('category_tree', function($query) {
         return $query
             ->from('categories')
             ->select('id', 'name', 'parent_id')
@@ -840,9 +860,9 @@ $qb->from('category_tree')
                 return $q
                     ->from('categories')
                     ->select('categories.id', 'categories.name', 'categories.parent_id')
-                    ->join('category_tree', 'category_tree.id = categories.parent_id'); // recursive join
+                    ->join('category_tree', 'category_tree.id = categories.parent_id');
             });
-    }, recursive: true)
+    })
     ->select('id', 'name', 'parent_id')
     ->toSql();
 // WITH RECURSIVE category_tree AS (
@@ -853,9 +873,26 @@ $qb->from('category_tree')
 // )
 // SELECT id, name, parent_id FROM category_tree
 
-// CTE bindings are compiled first, before SELECT bindings
-$bindings = $qb->getBindings();
-// CTE bindings appear at the start of the compiled bindings array
+// Mixing regular and recursive CTEs in the same chain
+// The presence of withRecursive() causes the whole clause to be WITH RECURSIVE
+$qb->from('result')
+    ->with('active', fn($q) => $q->from('users')->where('status', 'active'))
+    ->withRecursive('org_tree', function($q) {
+        return $q->from('employees')
+                 ->select('id', 'name', 'manager_id')
+                 ->whereNull('manager_id')
+                 ->unionAll(fn($u) => $u
+                     ->from('employees')
+                     ->select('employees.id', 'employees.name', 'employees.manager_id')
+                     ->join('org_tree', 'org_tree.id = employees.manager_id'));
+    })
+    ->with('result', fn($q) => $q->from('org_tree')->join('active', 'active.id = org_tree.id'))
+    ->get();
+// WITH RECURSIVE active AS (...), org_tree AS (...), result AS (...)
+// SELECT * FROM result
+
+// CTE bindings compile before SELECT bindings — the order in getBindings() is:
+// [cte bindings...] [select bindings...] [join bindings...] [where bindings...] ...
 ```
 
 ---
@@ -1426,9 +1463,9 @@ $qb->from('final')
     ->with('final',  fn($q) => $q->from('totals')->where('spent', '>', 500))
     ->orderByDesc('spent');
 
-// Recursive CTE — category tree traversal
+// Recursive CTE — withRecursive() makes the intent explicit
 $qb->from('tree')
-    ->with('tree', function($q) {
+    ->withRecursive('tree', function($q) {
         return $q->from('categories')
                  ->select('id', 'name', 'parent_id')
                  ->where('parent_id', null)
@@ -1436,8 +1473,13 @@ $qb->from('tree')
                      ->from('categories')
                      ->select('categories.id', 'categories.name', 'categories.parent_id')
                      ->join('tree', 'tree.id = categories.parent_id'));
-    }, recursive: true)
+    })
     ->get();
+
+// with() and withRecursive() are interchangeable for recursive CTEs —
+// use whichever reads more clearly at the call site
+$qb->with('tree', $callback, recursive: true);  // explicit flag
+$qb->withRecursive('tree', $callback);           // shorthand — same output
 ```
 
 ### JSON Patterns
